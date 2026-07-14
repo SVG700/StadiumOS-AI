@@ -17,8 +17,7 @@ const genAI = isGeminiConfigured ? new GoogleGenerativeAI(apiKey!) : null;
  */
 export async function askGemini(prompt: string, systemInstruction?: string): Promise<string> {
   if (!isGeminiConfigured || !genAI) {
-    // Return interactive simulated operational responses
-    return simulateStadiumAI(prompt);
+    return "AI Assistant is currently unavailable. Please configure the Gemini API key.";
   }
 
   try {
