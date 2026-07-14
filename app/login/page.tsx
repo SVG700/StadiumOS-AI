@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Shield, Info, Ticket, Globe, ArrowLeft } from 'lucide-react';
 
 function LoginFormContent() {
-  const { signIn, isDemoMode } = useAuth();
+  const { signIn } = useAuth();
   const searchParams = useSearchParams();
   
   // Initialize portal from query param, fallback to visitor
@@ -29,29 +29,62 @@ function LoginFormContent() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedState, setCopiedState] = useState<'v' | 's' | 'f' | 'p' | null>(null);
 
-  // Auto-fill mock credentials when switching portals in demo mode
+  const handleCopy = (text: string, key: 'v' | 's' | 'f' | 'p') => {
+    navigator.clipboard.writeText(text);
+    setCopiedState(key);
+    setTimeout(() => setCopiedState(null), 2000);
+  };
+
+  const handleDemoLogin = async (portal: 'visitor' | 'staff' | 'fifa') => {
+    setSelectedPortal(portal);
+    
+    let demoEmail = 'visitor.demo@stadiumos.ai';
+    let demoPassword = 'Visitor@2026';
+    if (portal === 'staff') {
+      demoEmail = 'staff.demo@stadiumos.ai';
+      demoPassword = 'Staff@2026';
+    } else if (portal === 'fifa') {
+      demoEmail = 'fifa.demo@stadiumos.ai';
+      demoPassword = 'FIFA@2026';
+    }
+
+    setEmail(demoEmail);
+    setPassword(demoPassword);
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const result = await signIn(demoEmail, demoPassword);
+      if (!result.success) {
+        setError(result.error || 'Login failed.');
+        setIsLoading(false);
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      setError(errorMsg);
+      setIsLoading(false);
+    }
+  };
+
+  // Auto-fill credentials when switching portals
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (isDemoMode) {
-        if (selectedPortal === 'visitor') {
-          setEmail('visitor@stadiumos.ai');
-          setPassword('stadiumos');
-        } else if (selectedPortal === 'staff') {
-          setEmail('staff@stadiumos.ai');
-          setPassword('stadiumos');
-        } else if (selectedPortal === 'fifa') {
-          setEmail('fifa@stadiumos.ai');
-          setPassword('stadiumos');
-        }
-      } else {
-        setEmail('');
-        setPassword('');
+      if (selectedPortal === 'visitor') {
+        setEmail('visitor.demo@stadiumos.ai');
+        setPassword('Visitor@2026');
+      } else if (selectedPortal === 'staff') {
+        setEmail('staff.demo@stadiumos.ai');
+        setPassword('Staff@2026');
+      } else if (selectedPortal === 'fifa') {
+        setEmail('fifa.demo@stadiumos.ai');
+        setPassword('FIFA@2026');
       }
       setError(null);
     }, 0);
     return () => clearTimeout(timer);
-  }, [selectedPortal, isDemoMode]);
+  }, [selectedPortal]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -232,32 +265,151 @@ function LoginFormContent() {
           </Button>
         </form>
 
-        {/* Local Demo Mode Credentials Display */}
-        {isDemoMode && (
-          <div className="mt-5 rounded-xl border border-slate-900 bg-slate-950/50 p-4 text-xs text-slate-300">
-            <div className="flex items-center gap-1.5 font-bold text-cyan-400 mb-2">
-              <Info className="h-3.5 w-3.5" />
-              <span>Demo Mode Pre-filled Credentials</span>
-            </div>
-            <p className="text-slate-400 text-[11px] leading-relaxed mb-2.5">
-              Supabase database credentials are not configured. Use the pre-filled mock user to test this portal:
-            </p>
-            <div className="rounded border border-slate-800 bg-[#070b13]/60 p-2.5 font-mono text-[10px] text-cyan-300">
-              <div className="flex justify-between mb-0.5">
-                <span>Portal Role:</span>
-                <span className="text-white capitalize">{selectedPortal}</span>
-              </div>
-              <div className="flex justify-between mb-0.5">
-                <span>Demo Email:</span>
-                <span className="text-white">{email}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Demo Password:</span>
-                <span className="text-white">{password}</span>
-              </div>
-            </div>
+        {/* Judge Sandbox Operations (One-Click Bypass) */}
+        <div className="mt-6 pt-5 border-t border-slate-900/60 space-y-3">
+          <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+            Judge Sandbox Operations (One-Click Bypass)
+          </span>
+          <div>
+            {selectedPortal === 'visitor' && (
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('visitor')}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-cyan-400 bg-cyan-950/20 border border-cyan-800/30 hover:border-cyan-500/60 hover:bg-cyan-950/40 transition duration-300 cursor-pointer flex items-center justify-center gap-1.5 shadow-md font-sans"
+              >
+                <span>Login as Visitor Demo</span>
+              </button>
+            )}
+            {selectedPortal === 'staff' && (
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('staff')}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-emerald-400 bg-emerald-950/20 border border-emerald-800/30 hover:border-emerald-500/60 hover:bg-emerald-950/40 transition duration-300 cursor-pointer flex items-center justify-center gap-1.5 shadow-md font-sans"
+              >
+                <span>Login as Staff Demo</span>
+              </button>
+            )}
+            {selectedPortal === 'fifa' && (
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('fifa')}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-amber-400 bg-amber-950/20 border border-amber-800/30 hover:border-amber-500/60 hover:bg-amber-950/40 transition duration-300 cursor-pointer flex items-center justify-center gap-1.5 shadow-md font-sans"
+              >
+                <span>Login as FIFA Demo</span>
+              </button>
+            )}
           </div>
-        )}
+        </div>
+
+        {/* Demo Credentials Panel */}
+        <div className="mt-5 rounded-xl border border-slate-900 bg-slate-950/50 p-4 text-xs text-slate-300">
+          <div className="flex items-center gap-1.5 font-bold text-cyan-400 mb-1.5">
+            <Info className="h-3.5 w-3.5" />
+            <span>Demo Credentials</span>
+          </div>
+          <p className="text-slate-400 text-[11px] leading-relaxed mb-3">
+            {selectedPortal === 'visitor' && 'Use the Visitor Demo account to explore the fan experience.'}
+            {selectedPortal === 'staff' && 'Use the Staff Demo account to explore stadium operations.'}
+            {selectedPortal === 'fifa' && 'Use the FIFA Executive Demo account to explore the Global Command Center.'}
+          </p>
+          <div className="space-y-2">
+            {selectedPortal === 'visitor' && (
+              <>
+                <div className="flex justify-between items-center bg-[#070b13]/60 px-3 py-2 rounded border border-slate-800/70 font-mono text-[10px]">
+                  <div>
+                    <span className="text-slate-500 block text-[9px] uppercase tracking-wider mb-0.5">Visitor Email</span>
+                    <span className="text-white">visitor.demo@stadiumos.ai</span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => handleCopy('visitor.demo@stadiumos.ai', 'v')} 
+                    className="text-[10px] text-cyan-400 hover:text-cyan-300 cursor-pointer font-sans underline"
+                  >
+                    {copiedState === 'v' ? 'Copied!' : 'Copy Email'}
+                  </button>
+                </div>
+                
+                <div className="flex justify-between items-center bg-[#070b13]/60 px-3 py-2 rounded border border-slate-800/70 font-mono text-[10px]">
+                  <div>
+                    <span className="text-slate-500 block text-[9px] uppercase tracking-wider mb-0.5">Default Password</span>
+                    <span className="text-white">Visitor@2026</span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => handleCopy('Visitor@2026', 'p')} 
+                    className="text-[10px] text-cyan-400 hover:text-cyan-300 cursor-pointer font-sans underline"
+                  >
+                    {copiedState === 'p' ? 'Copied!' : 'Copy Password'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {selectedPortal === 'staff' && (
+              <>
+                <div className="flex justify-between items-center bg-[#070b13]/60 px-3 py-2 rounded border border-slate-800/70 font-mono text-[10px]">
+                  <div>
+                    <span className="text-slate-500 block text-[9px] uppercase tracking-wider mb-0.5">Staff Email</span>
+                    <span className="text-white">staff.demo@stadiumos.ai</span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => handleCopy('staff.demo@stadiumos.ai', 's')} 
+                    className="text-[10px] text-emerald-400 hover:text-emerald-300 cursor-pointer font-sans underline"
+                  >
+                    {copiedState === 's' ? 'Copied!' : 'Copy Email'}
+                  </button>
+                </div>
+                
+                <div className="flex justify-between items-center bg-[#070b13]/60 px-3 py-2 rounded border border-slate-800/70 font-mono text-[10px]">
+                  <div>
+                    <span className="text-slate-500 block text-[9px] uppercase tracking-wider mb-0.5">Default Password</span>
+                    <span className="text-white">Staff@2026</span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => handleCopy('Staff@2026', 'p')} 
+                    className="text-[10px] text-emerald-400 hover:text-emerald-300 cursor-pointer font-sans underline"
+                  >
+                    {copiedState === 'p' ? 'Copied!' : 'Copy Password'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {selectedPortal === 'fifa' && (
+              <>
+                <div className="flex justify-between items-center bg-[#070b13]/60 px-3 py-2 rounded border border-slate-800/70 font-mono text-[10px]">
+                  <div>
+                    <span className="text-slate-500 block text-[9px] uppercase tracking-wider mb-0.5">FIFA Email</span>
+                    <span className="text-white">fifa.demo@stadiumos.ai</span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => handleCopy('fifa.demo@stadiumos.ai', 'f')} 
+                    className="text-[10px] text-amber-400 hover:text-amber-300 cursor-pointer font-sans underline"
+                  >
+                    {copiedState === 'f' ? 'Copied!' : 'Copy Email'}
+                  </button>
+                </div>
+                
+                <div className="flex justify-between items-center bg-[#070b13]/60 px-3 py-2 rounded border border-slate-800/70 font-mono text-[10px]">
+                  <div>
+                    <span className="text-slate-500 block text-[9px] uppercase tracking-wider mb-0.5">Default Password</span>
+                    <span className="text-white">FIFA@2026</span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => handleCopy('FIFA@2026', 'p')} 
+                    className="text-[10px] text-amber-400 hover:text-amber-300 cursor-pointer font-sans underline"
+                  >
+                    {copiedState === 'p' ? 'Copied!' : 'Copy Password'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
 
         <div className="mt-5 text-center text-xs text-slate-500 border-t border-slate-900/60 pt-4">
           {selectedPortal === 'visitor' ? (
@@ -267,11 +419,18 @@ function LoginFormContent() {
                 Create Visitor Account
               </Link>
             </>
+          ) : selectedPortal === 'staff' ? (
+            <>
+              Need a credentials clearance?{' '}
+              <Link href="/signup?role=staff" className="font-semibold text-cyan-400 hover:text-cyan-300 hover:underline">
+                Request Staff Account
+              </Link>
+            </>
           ) : (
             <>
               Need a credentials clearance?{' '}
-              <Link href="/signup" className="font-semibold text-cyan-400 hover:text-cyan-300 hover:underline">
-                Request Account
+              <Link href="/signup?role=fifa" className="font-semibold text-cyan-400 hover:text-cyan-300 hover:underline">
+                Request FIFA Account
               </Link>
             </>
           )}

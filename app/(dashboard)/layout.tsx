@@ -105,6 +105,11 @@ const getAllowedRoutes = (role: string): string[] => {
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const { user, signOut, isLoading, isDemoMode } = useAuth();
+  const isDemoAccount = !!(user?.email && [
+    'visitor.demo@stadiumos.ai',
+    'staff.demo@stadiumos.ai',
+    'fifa.demo@stadiumos.ai'
+  ].includes(user.email));
   const pathname = usePathname();
   const router = useRouter();
 
@@ -370,15 +375,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
               </span>
             </div>
           )}
-          <div className="mt-3 pt-2.5 border-t border-slate-900/60 text-[9px] font-mono text-slate-500 space-y-0.5 select-none">
-            <div className="flex justify-between"><span>Node Sync:</span><span className="text-emerald-400">LIVE</span></div>
-            <div className="flex justify-between"><span>Uptime:</span><span className="text-slate-300">99.98%</span></div>
-            <div className="flex justify-between"><span>Build Version:</span><span className="text-slate-300">v1.2.0-rc4</span></div>
-            <div className="flex justify-between"><span>Environment:</span><span className="text-slate-300">FIFA Node</span></div>
-            <div className="flex justify-between"><span>Latency:</span><span className="text-emerald-400">14ms</span></div>
-            <div className="flex justify-between"><span>Active Modules:</span><span className="text-slate-300">Twin, Synth</span></div>
-            <div className="flex justify-between"><span>Region:</span><span className="text-slate-300">CONCACAF</span></div>
-          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -454,15 +450,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                     </span>
                   </div>
                 )}
-                <div className="mt-3 pt-2.5 border-t border-slate-900/60 text-[9px] font-mono text-slate-500 space-y-0.5 select-none">
-                  <div className="flex justify-between"><span>Node Sync:</span><span className="text-emerald-400">LIVE</span></div>
-                  <div className="flex justify-between"><span>Uptime:</span><span className="text-slate-300">99.98%</span></div>
-                  <div className="flex justify-between"><span>Build Version:</span><span className="text-slate-300">v1.2.0-rc4</span></div>
-                  <div className="flex justify-between"><span>Environment:</span><span className="text-slate-300">FIFA Node</span></div>
-                  <div className="flex justify-between"><span>Latency:</span><span className="text-emerald-400">14ms</span></div>
-                  <div className="flex justify-between"><span>Active Modules:</span><span className="text-slate-300">Twin, Synth</span></div>
-                  <div className="flex justify-between"><span>Region:</span><span className="text-slate-300">CONCACAF</span></div>
-                </div>
                 <Button variant="ghost" size="sm" onClick={() => signOut()} className="w-full justify-start text-xs text-slate-400 hover:text-red-400 mt-3">
                   <LogOut className="mr-2 h-3.5 w-3.5" />
                   Sign Out Session
@@ -542,6 +529,11 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3">
+            {isDemoAccount && (
+              <Badge className="border-cyan-500/30 text-cyan-400 bg-cyan-950/20 px-2.5 py-0.5 text-[9px] font-bold tracking-widest uppercase animate-pulse select-none">
+                Demo Account
+              </Badge>
+            )}
             {/* Diagnostics Panel Button */}
             <Button 
               variant="ghost" 

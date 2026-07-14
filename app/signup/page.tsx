@@ -42,7 +42,7 @@ function SignupFormContent() {
       if (roleParam && ROLE_OPTIONS.some(opt => opt.value === roleParam)) {
         setRole(roleParam);
       } else {
-        setRole('organizer');
+        setRole('visitor');
       }
     }, 0);
     return () => clearTimeout(timer);

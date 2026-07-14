@@ -120,6 +120,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      // --- JUDGE DEMO ACCOUNT BOOTSTRAP ---
+      const demoUsersStr = localStorage.getItem('stadium_os_demo_users') || '[]';
+      let demoUsers = [];
+      try {
+        demoUsers = JSON.parse(demoUsersStr);
+      } catch {
+        demoUsers = [];
+      }
+      
+      const targetDemoUsers = [
+        { email: 'visitor.demo@stadiumos.ai', password: 'Visitor@2026', name: 'Visitor Demo', role: 'visitor' as const },
+        { email: 'staff.demo@stadiumos.ai', password: 'Staff@2026', name: 'Staff Demo', role: 'staff' as const },
+        { email: 'fifa.demo@stadiumos.ai', password: 'FIFA@2026', name: 'FIFA Executive Demo', role: 'fifa' as const }
+      ];
+
+      let updatedLocal = false;
+      targetDemoUsers.forEach(target => {
+        if (!demoUsers.some((u: { email: string }) => u.email === target.email)) {
+          demoUsers.push({
+            id: `demo-${target.role}-id`,
+            email: target.email,
+            name: target.name,
+            role: target.role,
+            password: target.password,
+            createdAt: new Date().toISOString()
+          });
+          updatedLocal = true;
+        }
+      });
+      if (updatedLocal) {
+        localStorage.setItem('stadium_os_demo_users', JSON.stringify(demoUsers));
+      }
+
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { data: existingProfiles } = await supabase
+            .from('profiles')
+            .select('email')
+            .in('email', ['visitor.demo@stadiumos.ai', 'staff.demo@stadiumos.ai', 'fifa.demo@stadiumos.ai']);
+          
+          const existingEmails = (existingProfiles || []).map(p => p.email);
+          
+          for (const target of targetDemoUsers) {
+            if (!existingEmails.includes(target.email)) {
+              await supabase.auth.signUp({
+                email: target.email,
+                password: target.password,
+                options: {
+                  data: { name: target.name, role: target.role },
+                  emailRedirectTo: `${window.location.origin}/auth/callback`,
+                }
+              }).catch(() => {});
+            }
+          }
+        } catch (err) {
+          console.warn('Supabase demo bootstrap warning:', err);
+        }
+      }
+
       // --- LOCAL DEMO SESSION MANAGEMENT ---
       const demoUserStr = localStorage.getItem('stadium_os_demo_user');
       if (demoUserStr) {
@@ -165,8 +224,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email,
           password,
           options: {
-            data: { name, role },
             emailRedirectTo: `${window.location.origin}/auth/callback`,
+            data: {
+              name,
+              role,
+            },
           },
         });
 
@@ -175,16 +237,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Profile will be created via database trigger on auth.users in Supabase,
         // but we'll also insert it explicitly in case the trigger is not set up
         if (data.user) {
-          // Map to standard schema roles to prevent database check constraint failure
-          let dbRole: string = role;
-          if (role === 'visitor') dbRole = 'fan';
-          else if (role === 'staff') dbRole = 'organizer';
-          else if (role === 'fifa') dbRole = 'admin';
-
           const { error: profileError } = await supabase.from('profiles').upsert({
             id: data.user.id,
             name,
-            role: dbRole,
+            role,
             email,
             created_at: new Date().toISOString(),
           });
@@ -229,6 +285,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // --- SIGN IN ---
   const signIn = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    // Intercept Demo Accounts for Judges (Bypasses email verification)
+    const demoAccounts = [
+      { email: 'visitor.demo@stadiumos.ai', password: 'Visitor@2026', name: 'Visitor Demo', role: 'visitor' as const },
+      { email: 'staff.demo@stadiumos.ai', password: 'Staff@2026', name: 'Staff Demo', role: 'staff' as const },
+      { email: 'fifa.demo@stadiumos.ai', password: 'FIFA@2026', name: 'FIFA Executive Demo', role: 'fifa' as const }
+    ];
+
+    const matchedDemo = demoAccounts.find(d => d.email === email);
+    if (matchedDemo) {
+      if (password === matchedDemo.password) {
+        const demoUser: UserProfile = {
+          id: `demo-${matchedDemo.role}-id`,
+          email: matchedDemo.email,
+          name: matchedDemo.name,
+          role: matchedDemo.role,
+          createdAt: new Date().toISOString()
+        };
+        localStorage.setItem('stadium_os_demo_user', JSON.stringify(demoUser));
+        
+        if (isSupabaseConfigured && supabase) {
+          (async () => {
+            try {
+              await supabase.from('profiles').upsert({
+                id: `demo-${matchedDemo.role}-id`,
+                name: matchedDemo.name,
+                role: matchedDemo.role,
+                email: matchedDemo.email,
+                created_at: new Date().toISOString()
+              });
+            } catch (err) {
+              console.warn('Supabase demo upsert failed', err);
+            }
+          })();
+        }
+
+        setUser(demoUser);
+        router.push(getDashboardForRole(demoUser.role));
+        return { success: true };
+      } else {
+        return { success: false, error: 'Invalid credentials for protected demo account.' };
+      }
+    }
+
     if (isSupabaseConfigured && supabase) {
       try {
         const { error, data } = await supabase.auth.signInWithPassword({ email, password });

@@ -10,7 +10,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { playSynthTone } from '@/lib/audio';
 import { 
   Settings, Shield, Server, Bot, Save, CheckCircle, Info, Volume2, 
-  Accessibility, Languages, Eye, Layout, Type
+  Accessibility, Languages, Eye, Layout, Type, AlertTriangle
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -19,6 +19,7 @@ export default function SettingsPage() {
   // Settings Form States
   const [profileName, setProfileName] = useState(user?.name || '');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Preference States
   const [soundEnabled, setSoundEnabled] = useState(false);
@@ -46,6 +47,19 @@ export default function SettingsPage() {
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Check if demo user is attempting to edit protected attributes
+    const isDemoUser = !!(user?.email && [
+      'visitor.demo@stadiumos.ai',
+      'staff.demo@stadiumos.ai',
+      'fifa.demo@stadiumos.ai'
+    ].includes(user.email));
+
+    if (isDemoUser && profileName !== user?.name) {
+      setError('This is a protected demonstration account.');
+      setTimeout(() => setError(null), 4000);
+      return;
+    }
+
     // Save to localStorage
     localStorage.setItem('stadium_sound_enabled', String(soundEnabled));
     localStorage.setItem('stadium_animations_enabled', String(animationsEnabled));
@@ -137,6 +151,19 @@ export default function SettingsPage() {
             </CardHeader>
             <form onSubmit={handleSaveSettings}>
               <CardContent className="space-y-5">
+                {user?.email && [
+                  'visitor.demo@stadiumos.ai',
+                  'staff.demo@stadiumos.ai',
+                  'fifa.demo@stadiumos.ai'
+                ].includes(user.email) && (
+                  <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3.5 text-xs text-cyan-400 flex gap-2 items-start border-l-4 border-l-cyan-500">
+                    <Shield className="h-4.5 w-4.5 shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <span className="font-bold">Protected Demonstration Account</span>
+                      <p className="text-[10px] text-slate-400 font-sans">This is a protected demonstration account. Credentials and clearance roles cannot be modified.</p>
+                    </div>
+                  </div>
+                )}
                 
                 {/* Identifier Profile name */}
                 <div>
@@ -279,7 +306,11 @@ export default function SettingsPage() {
 
               </CardContent>
               <CardFooter className="flex justify-between items-center border-t border-slate-900/60 pt-4 p-6 bg-slate-950/15">
-                {saveSuccess ? (
+                {error ? (
+                  <span className="text-xs text-red-400 flex items-center gap-1.5 font-bold animate-shake">
+                    <AlertTriangle className="h-4 w-4" /> {error}
+                  </span>
+                ) : saveSuccess ? (
                   <span className="text-xs text-emerald-400 flex items-center gap-1.5 font-bold">
                     <CheckCircle className="h-4 w-4" /> Preferences applied successfully!
                   </span>
