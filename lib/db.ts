@@ -344,7 +344,7 @@ export class DatabaseService {
     if (isSupabaseConfigured) {
       const supabase = getSupabaseBrowserClient();
       if (supabase) {
-        const updates: any = { status };
+        const updates: Record<string, string> = { status };
         if (task) updates.task = task;
         if (location) updates.location = location;
         const { error } = await supabase

@@ -14,11 +14,12 @@ export async function sendChatMessage(prompt: string) {
   try {
     const reply = await askGemini(prompt, SYSTEM_INSTRUCTION);
     return { success: true, reply };
-  } catch (error: any) {
-    console.error('Error in sendChatMessage action:', error);
+  } catch (error) {
+    const err = error as Error;
+    console.error('Error in sendChatMessage action:', err);
     return { 
       success: false, 
-      error: error.message || 'Failed to generate operational response' 
+      error: err.message || 'Failed to generate operational response' 
     };
   }
 }

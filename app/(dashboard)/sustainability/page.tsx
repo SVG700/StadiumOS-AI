@@ -6,8 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { 
-  Leaf, Sun, Wind, Trash2, Droplet, CheckCircle, Award, Compass, 
-  Bus, Info, Calendar, Sparkles, MapPin, Coffee, HelpCircle, Trophy
+  Leaf, Sun, Trash2, Droplet, CheckCircle, 
+  Bus, Calendar, Sparkles, MapPin, Trophy
 } from 'lucide-react';
 
 export default function SustainabilityPage() {
@@ -17,7 +17,8 @@ export default function SustainabilityPage() {
   const [scanned, setScanned] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const timer = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(timer);
   }, []);
 
   if (!mounted || !user) return null;

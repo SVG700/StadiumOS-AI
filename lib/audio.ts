@@ -6,7 +6,7 @@ export const playSynthTone = (type: 'success' | 'dispatch' | 'emergency' | 'noti
   if (!soundEnabled) return;
 
   try {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ctx = new AudioContextClass();
     
     if (type === 'notification') {

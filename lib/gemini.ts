@@ -33,9 +33,10 @@ export async function askGemini(prompt: string, systemInstruction?: string): Pro
     const result = await model.generateContent(formattedPrompt);
     const response = await result.response;
     return response.text() || 'Unable to retrieve text response from Gemini.';
-  } catch (error: any) {
-    console.error('Error invoking Gemini SDK:', error);
-    return `[Gemini API Offline] ${simulateStadiumAI(prompt)} (Error Detail: ${error.message || error})`;
+  } catch (error) {
+    const err = error as Error;
+    console.error('Error invoking Gemini SDK:', err);
+    return `[Gemini API Offline] ${simulateStadiumAI(prompt)} (Error Detail: ${err.message || String(err)})`;
   }
 }
 

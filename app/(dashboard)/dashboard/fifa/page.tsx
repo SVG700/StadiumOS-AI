@@ -6,16 +6,42 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { useStadium, MatchPhase, SimulatedIncident, AfterActionReport } from '@/components/stadium/StadiumContext';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useStadium, MatchPhase, AfterActionReport } from '@/components/stadium/StadiumContext';
+import { AnimatePresence } from 'framer-motion';
 import { AnimatedNumber } from '@/components/stadium/AnimatedNumber';
+import dynamic from 'next/dynamic';
+
+const ResponsiveContainer = dynamic(
+  () => import('recharts').then((m) => m.ResponsiveContainer),
+  { ssr: false }
+);
+const AreaChart = dynamic(
+  () => import('recharts').then((m) => m.AreaChart),
+  { ssr: false }
+);
+const Area = dynamic(
+  () => import('recharts').then((m) => m.Area),
+  { ssr: false }
+);
+const XAxis = dynamic(
+  () => import('recharts').then((m) => m.XAxis),
+  { ssr: false }
+);
+const YAxis = dynamic(
+  () => import('recharts').then((m) => m.YAxis),
+  { ssr: false }
+);
+const Tooltip = dynamic(
+  () => import('recharts').then((m) => m.Tooltip),
+  { ssr: false }
+);
+const Legend = dynamic(
+  () => import('recharts').then((m) => m.Legend),
+  { ssr: false }
+);
 import { 
-  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, Legend
-} from 'recharts';
-import { 
-  Globe, AlertTriangle, Play, CheckCircle2, RefreshCw, Trophy, ShieldAlert,
-  FlameKindling, Sun, Shield, Layers, HelpCircle, Activity, Sparkles,
-  Users, Ticket, Bus, HeartPulse, Clock, FileText, ArrowRight, X, Printer
+  Globe, AlertTriangle, Trophy, ShieldAlert, FlameKindling, Sun, 
+  Activity, Clock, FileText, Printer
 } from 'lucide-react';
 
 export default function FifaDashboard() {
@@ -26,15 +52,11 @@ export default function FifaDashboard() {
     selectedStadium,
     selectStadium,
     timeline,
-    history,
-    executeAction,
-    rejectRecommendation,
     changeMatchPhase,
     executePlaybook,
     triggerRandomIncident,
     resilienceScore,
-    fanExperienceScore,
-    fanExperienceBreakdown
+    fanExperienceScore
   } = useStadium();
 
   // Dialog state for After Action Reports
@@ -45,7 +67,6 @@ export default function FifaDashboard() {
   // Compute total mock statistics across all 8 stadiums
   const totalCrowd = stadiums.reduce((sum, s) => sum + s.visitors.total, 0);
   const totalAlerts = stadiums.reduce((sum, s) => sum + s.alerts.filter(a => a.status !== 'resolved').length, 0);
-  const totalTransit = stadiums.reduce((sum, s) => sum + s.transport.length, 0);
   
   const metrics = {
     totalAttendance: totalCrowd,
@@ -431,7 +452,7 @@ export default function FifaDashboard() {
               {selectedStadium.simulatedIncidents.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 text-xs space-y-1">
                   <span>Excellent! No incidents require attention.</span>
-                  <span className="block text-[10px] text-slate-600">You're all caught up.</span>
+                  <span className="block text-[10px] text-slate-600">You&apos;re all caught up.</span>
                 </div>
               ) : (
                 selectedStadium.simulatedIncidents.map((inc) => (

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
   CrowdDensity, ActiveVisitors, EmergencyAlert, TransportStatus, 
   AccessibilityRequest, SustainabilityMetrics, VolunteerActivity 
@@ -573,9 +573,9 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Load from local storage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const getL = (key: string, fallback: any) => {
+      const getL = <T,>(key: string, fallback: T): T => {
         const val = localStorage.getItem(key);
-        return val ? JSON.parse(val) : fallback;
+        return val ? JSON.parse(val) as T : fallback;
       };
       const savedStadiums = getL('stadium_multi_list', INITIAL_STADIUMS);
       const savedSelectedId = getL('stadium_selected_id', 'vancouver');
@@ -635,8 +635,6 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
   else if (healthScore < 90) stadiumHealth = 'Good';
 
   // Live Fan Experience Index Calculation (Dynamic)
-  let restroomWait = 2; // mins default
-  let foodWait = 4;
   let weatherComfort = 92;
   
   if (selectedStadium.weather.temp >= 32) weatherComfort -= 20;
@@ -673,19 +671,25 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
   resilienceScore = Math.max(5, Math.min(100, resilienceScore));
 
   // central log timeline helper
-  const triggerLog = (event: string, type: TimelineItem['type'] = 'system') => {
+  const triggerLog = useCallback((event: string, type: TimelineItem['type'] = 'system') => {
     const time = new Date().toTimeString().split(' ')[0].substring(0, 5);
-    const updated = [{ time, event, type }, ...timeline];
-    saveState('stadium_ops_timeline', updated, setTimeline);
-  };
+    setTimeline(prevTimeline => {
+      const updated = [{ time, event, type }, ...prevTimeline];
+      localStorage.setItem('stadium_ops_timeline', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
   // central notification helper
-  const triggerNotif = (message: string, type: NotificationItem['type'] = 'operational') => {
+  const triggerNotif = useCallback((message: string, type: NotificationItem['type'] = 'operational') => {
     const time = new Date().toTimeString().split(' ')[0].substring(0, 5);
-    const updated = [{ id: `not-${Date.now()}`, message, type, read: false, timestamp: time }, ...notifications];
-    saveState('stadium_notifications', updated, setNotifications);
+    setNotifications(prevNotifications => {
+      const updated = [{ id: `not-${Date.now()}`, message, type, read: false, timestamp: time }, ...prevNotifications];
+      localStorage.setItem('stadium_notifications', JSON.stringify(updated));
+      return updated;
+    });
     playSynthTone('notification');
-  };
+  }, []);
 
   // helper to update a specific property of the currently active stadium in the array
   const updateActiveStadium = (mutatedProps: Partial<StadiumData>) => {
@@ -818,107 +822,107 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
     playSynthTone('emergency');
   };
 
-  // AI DIGITAL TWIN LOOP: interpolates stadium telemetry values every 15 seconds
+  // AI DIGITAL TWIN LOOP: interpolates stadium telemetry values every 18 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       // Loop over all stadiums and slightly adjust values (crowd, weather, sustainability)
-      const interpolated = stadiums.map(stadium => {
-        // 1. Crowd Density fluctuation
-        const updatedCrowd = stadium.crowdDensity.map(c => {
-          const change = Math.floor(Math.random() * 3) - 1; // -1, 0, +1
-          const nextDensity = Math.min(100, Math.max(5, c.density + change));
-          return {
-            ...c,
-            density: nextDensity,
-            currentCount: Math.round(c.capacity * (nextDensity / 100))
-          };
-        });
+      setStadiums(prevStadiums => {
+        return prevStadiums.map(stadium => {
+          // 1. Crowd Density fluctuation
+          const updatedCrowd = stadium.crowdDensity.map(c => {
+            const change = Math.floor(Math.random() * 3) - 1; // -1, 0, +1
+            const nextDensity = Math.min(100, Math.max(5, c.density + change));
+            return {
+              ...c,
+              density: nextDensity,
+              currentCount: Math.round(c.capacity * (nextDensity / 100))
+            };
+          });
 
-        // 2. Weather temp fluctuation
-        const tempChange = Math.floor(Math.random() * 3) - 1; // -1, 0, +1 temp change
-        const nextTemp = Math.min(42, Math.max(12, stadium.weather.temp + tempChange * 0.2));
+          // 2. Weather temp fluctuation
+          const tempChange = Math.floor(Math.random() * 3) - 1; // -1, 0, +1 temp change
+          const nextTemp = Math.min(42, Math.max(12, stadium.weather.temp + tempChange * 0.2));
 
-        // 3. Sustainability Energy Output
-        const energyChange = Math.floor(Math.random() * 100) - 50;
-        const nextEnergy = Math.min(9000, Math.max(1000, stadium.sustainability.energyUsageKw + energyChange));
+          // 3. Sustainability Energy Output
+          const energyChange = Math.floor(Math.random() * 100) - 50;
+          const nextEnergy = Math.min(9000, Math.max(1000, stadium.sustainability.energyUsageKw + energyChange));
 
-        // 4. Incident Lifecycle Evolution (Detected -> Assigned -> Responding -> Contained -> Resolved -> Archived)
-        const updatedIncidents = stadium.simulatedIncidents.map(inc => {
-          if (inc.status === 'archived') return inc;
-          
-          let nextProgress = inc.progress + Math.floor(Math.random() * 15) + 5;
-          let nextStatus: SimulatedIncident['status'] = inc.status;
+          // 4. Incident Lifecycle Evolution (Detected -> Assigned -> Responding -> Contained -> Resolved -> Archived)
+          const updatedIncidents = stadium.simulatedIncidents.map(inc => {
+            if (inc.status === 'archived') return inc;
+            
+            let nextProgress = inc.progress + Math.floor(Math.random() * 15) + 5;
+            let nextStatus: SimulatedIncident['status'] = inc.status;
 
-          if (nextProgress >= 100) {
-            nextProgress = 100;
-            if (inc.status !== 'resolved') {
-              nextStatus = 'resolved';
-              
-              // Generate After Action Report UI PDF mock
-              const reportId = `rep-${inc.id}`;
-              const actionReport: AfterActionReport = {
-                id: reportId,
-                title: inc.title,
-                summary: `AI Digital Twin automatically resolved incident: ${inc.title} at ${inc.location}. Operational stability restored.`,
-                timeline: [
-                  { time: 'T+0m', event: `Incident detected by AI Telemetry sensors.` },
-                  { time: 'T+2m', event: `Security Dispatch payload deployed.` },
-                  { time: 'T+8m', event: `Operations crews contained corridor bottlenecks.` },
-                  { time: 'T+12m', event: `Resolution verified. Systems returned to nominal.` }
-                ],
-                departments: ['Venue Operations', 'AI Control Team', 'Staff Volunteers'],
-                aiActions: [inc.recommendedResponse],
-                humanActions: ['Field verification check', 'CCTV monitoring log completed'],
-                resolutionTime: inc.expectedResolutionTime,
-                lessonsLearned: 'Sensor configuration requires regular baseline calibration to reduce false alarms.',
-                futureRecommendation: 'Establish redundant backup terminals at Gate entrance lines.'
-              };
-              inc.afterActionReport = actionReport;
+            if (nextProgress >= 100) {
+              nextProgress = 100;
+              if (inc.status !== 'resolved') {
+                nextStatus = 'resolved';
+                
+                // Generate After Action Report UI PDF mock
+                const reportId = `rep-${inc.id}`;
+                const actionReport: AfterActionReport = {
+                  id: reportId,
+                  title: inc.title,
+                  summary: `AI Digital Twin automatically resolved incident: ${inc.title} at ${inc.location}. Operational stability restored.`,
+                  timeline: [
+                    { time: 'T+0m', event: `Incident detected by AI Telemetry sensors.` },
+                    { time: 'T+2m', event: `Security Dispatch payload deployed.` },
+                    { time: 'T+8m', event: `Operations crews contained corridor bottlenecks.` },
+                    { time: 'T+12m', event: `Resolution verified. Systems returned to nominal.` }
+                  ],
+                  departments: ['Venue Operations', 'AI Control Team', 'Staff Volunteers'],
+                  aiActions: [inc.recommendedResponse],
+                  humanActions: ['Field verification check', 'CCTV monitoring log completed'],
+                  resolutionTime: inc.expectedResolutionTime,
+                  lessonsLearned: 'Sensor configuration requires regular baseline calibration to reduce false alarms.',
+                  futureRecommendation: 'Establish redundant backup terminals at Gate entrance lines.'
+                };
+                inc.afterActionReport = actionReport;
 
-              // Dispatch notification
-              setTimeout(() => {
-                triggerLog(`Incident Resolved: ${inc.title} resolved at ${stadium.name}.`, inc.type);
-                triggerNotif(`✓ Incident Resolved: ${inc.title} at ${stadium.city}.`, inc.type);
-                playSynthTone('success');
-              }, 100);
-            } else {
-              nextStatus = 'archived';
+                // Dispatch notification
+                setTimeout(() => {
+                  triggerLog(`Incident Resolved: ${inc.title} resolved at ${stadium.name}.`, inc.type);
+                  triggerNotif(`✓ Incident Resolved: ${inc.title} at ${stadium.city}.`, inc.type);
+                  playSynthTone('success');
+                }, 100);
+              } else {
+                nextStatus = 'archived';
+              }
+            } else if (nextProgress > 80) {
+              nextStatus = 'contained';
+            } else if (nextProgress > 50) {
+              nextStatus = 'responding';
+            } else if (nextProgress > 20) {
+              nextStatus = 'assigned';
             }
-          } else if (nextProgress > 80) {
-            nextStatus = 'contained';
-          } else if (nextProgress > 50) {
-            nextStatus = 'responding';
-          } else if (nextProgress > 20) {
-            nextStatus = 'assigned';
-          }
+
+            return {
+              ...inc,
+              status: nextStatus,
+              progress: nextProgress
+            };
+          });
 
           return {
-            ...inc,
-            status: nextStatus,
-            progress: nextProgress
+            ...stadium,
+            crowdDensity: updatedCrowd,
+            weather: {
+              ...stadium.weather,
+              temp: parseFloat(nextTemp.toFixed(1))
+            },
+            sustainability: {
+              ...stadium.sustainability,
+              energyUsageKw: nextEnergy
+            },
+            simulatedIncidents: updatedIncidents
           };
         });
-
-        return {
-          ...stadium,
-          crowdDensity: updatedCrowd,
-          weather: {
-            ...stadium.weather,
-            temp: parseFloat(nextTemp.toFixed(1))
-          },
-          sustainability: {
-            ...stadium.sustainability,
-            energyUsageKw: nextEnergy
-          },
-          simulatedIncidents: updatedIncidents
-        };
       });
-
-      setStadiums(interpolated);
     }, 18000); // Trigger every 18 seconds!
 
     return () => clearInterval(interval);
-  }, [stadiums]);
+  }, [triggerLog, triggerNotif]);
 
   // REUSABLE AI ACTION EXECUTION ENGINE
   const executeAction = async (actionType: string, prompt: string): Promise<boolean> => {

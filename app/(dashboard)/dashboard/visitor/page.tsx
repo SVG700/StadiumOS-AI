@@ -6,10 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useStadium } from '@/components/stadium/StadiumContext';
-import { TransportStatus, AccessibilityRequest } from '@/types';
 import { 
-  MapPin, Ticket, Bus, Bot, Accessibility, Leaf, Bell, User, QrCode, 
-  Map, ArrowUpRight, Compass, FlameKindling, Navigation, Smile, Coffee, HelpCircle, Trophy, Info, Sun, CloudRain
+  Ticket, Bus, Bot, Leaf, QrCode, Compass, Coffee, Trophy, Info, Sun
 } from 'lucide-react';
 import Link from 'next/link';
 import { AnimatedNumber } from '@/components/stadium/AnimatedNumber';
@@ -20,7 +18,8 @@ export default function VisitorDashboard() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const timer = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(timer);
   }, []);
 
   if (!mounted || !user) {

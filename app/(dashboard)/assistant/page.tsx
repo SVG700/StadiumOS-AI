@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { sendChatMessage } from '@/app/actions/chat';
 import { ChatMessage } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -12,8 +11,8 @@ import { useStadium } from '@/components/stadium/StadiumContext';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Bot, Send, User, Sparkles, Terminal, Shield, CheckCircle, AlertTriangle, Info, Map, 
-  HelpCircle, ShieldAlert, PhoneCall, Accessibility, Check, X, ShieldCheck
+  Bot, Send, User, Sparkles, Terminal, CheckCircle, AlertTriangle, Info, Map, 
+  ShieldAlert, PhoneCall, Accessibility, Check, X, ShieldCheck
 } from 'lucide-react';
 
 const QUICK_PROMPTS_VISITOR = [
@@ -36,12 +35,16 @@ interface Toast {
   type: 'success' | 'info' | 'warning';
 }
 
+// Purity helpers defined outside the component scope
+let messageCounter = 0;
+const generateUniqueId = (prefix: string) => `${prefix}-${++messageCounter}-${Math.random().toString(36).substring(2, 6)}`;
+const getIsoTimestamp = () => new Date().toISOString();
+
 export default function AIAssistantPage() {
   const { user } = useAuth();
-  const router = useRouter();
 
   // Shared Stadium Context
-  const { executeAction, rejectRecommendation, history } = useStadium();
+  const { executeAction, rejectRecommendation } = useStadium();
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -65,33 +68,22 @@ export default function AIAssistantPage() {
 
   // Initialize welcome message based on role
   useEffect(() => {
-    if (isVisitor) {
+    const content = isVisitor
+      ? `Welcome to Stadium Alpha! I am your **FIFA Fan Companion AI**. \n\nI can help you locate your seat, find the nearest restrooms, locate concessions/tacos, get parking guidance, book wheelchair assistance, or request security and volunteers.\n\nWhat can I help you find in the stadium today?`
+      : `Hello! I am the **StadiumOS AI Decision Engine**. \n\nI monitor live camera feeds, gate queues, transit schedules, emergency dispatches, and green grids. \n\nSubmit operational prompts to analyze risks, deploy personnel, or adjust stadium parameters.`;
+
+    const timer = setTimeout(() => {
       setMessages([
         {
           id: 'welcome',
           sender: 'assistant',
-          content: `Welcome to Stadium Alpha! I am your **FIFA Fan Companion AI**. 
-
-I can help you locate your seat, find the nearest restrooms, locate concessions/tacos, get parking guidance, book wheelchair assistance, or request security and volunteers.
-
-What can I help you find in the stadium today?`,
-          timestamp: new Date().toISOString(),
+          content,
+          timestamp: getIsoTimestamp(),
         },
       ]);
-    } else {
-      setMessages([
-        {
-          id: 'welcome',
-          sender: 'assistant',
-          content: `Hello! I am the **StadiumOS AI Decision Engine**. 
+    }, 0);
 
-I monitor live camera feeds, gate queues, transit schedules, emergency dispatches, and green grids. 
-
-Submit operational prompts to analyze risks, deploy personnel, or adjust stadium parameters.`,
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-    }
+    return () => clearTimeout(timer);
   }, [isVisitor]);
 
   // Auto-scroll to bottom of chat
@@ -100,7 +92,7 @@ Submit operational prompts to analyze risks, deploy personnel, or adjust stadium
   }, [messages, isThinking]);
 
   const showToast = (message: string, type: 'success' | 'info' | 'warning' = 'success') => {
-    const id = `toast-${Date.now()}`;
+    const id = generateUniqueId('toast');
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -129,10 +121,10 @@ Submit operational prompts to analyze risks, deploy personnel, or adjust stadium
     setMessages(prev => [
       ...prev,
       {
-        id: `system-reject-${Date.now()}`,
+        id: generateUniqueId('system-reject'),
         sender: 'system',
         content: `❌ **AI Recommendation Rejected**: ${actionType.replace('_', ' ')} declined by executive command.`,
-        timestamp: new Date().toISOString()
+        timestamp: getIsoTimestamp()
       }
     ]);
   };
@@ -229,10 +221,10 @@ Submit operational prompts to analyze risks, deploy personnel, or adjust stadium
     if (!textToSend.trim() || isThinking) return;
 
     const userMsg: ChatMessage = {
-      id: `user-${Date.now()}`,
+      id: generateUniqueId('user'),
       sender: 'user',
       content: textToSend,
-      timestamp: new Date().toISOString(),
+      timestamp: getIsoTimestamp(),
     };
 
     setMessages((prev) => [...prev, userMsg]);
@@ -251,10 +243,10 @@ Submit operational prompts to analyze risks, deploy personnel, or adjust stadium
       setMessages((prev) => [
         ...prev,
         {
-          id: `assistant-${Date.now()}`,
+          id: generateUniqueId('assistant'),
           sender: 'assistant',
           content: simulated,
-          timestamp: new Date().toISOString(),
+          timestamp: getIsoTimestamp(),
         },
       ]);
       setIsThinking(false);
@@ -267,12 +259,12 @@ Submit operational prompts to analyze risks, deploy personnel, or adjust stadium
       setMessages((prev) => [
         ...prev,
         {
-          id: `assistant-${Date.now()}`,
+          id: generateUniqueId('assistant'),
           sender: 'assistant',
           content: result.success && result.reply 
             ? result.reply 
             : `Gemini Operational Hub: Target telemetry checked. Parameters nominal. No anomalies reported.`,
-          timestamp: new Date().toISOString(),
+          timestamp: getIsoTimestamp(),
         },
       ]);
     } catch (err) {
@@ -331,7 +323,7 @@ Submit operational prompts to analyze risks, deploy personnel, or adjust stadium
 
     const parsedText = cleanLines.map((line, idx) => {
       // Bold text replacement (**text**)
-      let boldLine = line;
+      const boldLine = line;
       const boldRegex = /\*\*(.*?)\*\*/g;
       const parts = [];
       let lastIndex = 0;

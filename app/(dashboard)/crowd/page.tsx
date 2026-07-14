@@ -4,7 +4,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Users, Eye, BarChart2, ShieldAlert, ArrowUpRight, TrendingUp } from 'lucide-react';
+import { BarChart2, ShieldAlert, TrendingUp } from 'lucide-react';
 
 export default function CrowdIntelligencePage() {
   return (

@@ -31,8 +31,9 @@ export default function ForgotPasswordPage() {
       } else {
         setError(result.error || 'Password reset request failed.');
       }
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      setError(errorMsg);
     } finally {
       setIsLoading(false);
     }

@@ -15,6 +15,10 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
 }
 
+interface DemoUser extends UserProfile {
+  password?: string;
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function mapDbRoleToPortalRole(dbRole: string): UserProfile['role'] {
@@ -190,9 +194,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        return { success: true };
-      } catch (err: any) {
-        return { success: false, error: err.message || 'Supabase signup failed' };
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Supabase signup failed';
+        return { success: false, error: errorMsg };
       }
     }
 
@@ -200,7 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const usersStr = localStorage.getItem('stadium_os_demo_users') || '[]';
     const users = JSON.parse(usersStr);
 
-    if (users.some((u: any) => u.email === email)) {
+    if (users.some((u: DemoUser) => u.email === email)) {
       return { success: false, error: 'User with this email already exists' };
     }
 
@@ -246,9 +250,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }).catch(() => {});
         }
 
-        return { success: true };
-      } catch (err: any) {
-        return { success: false, error: err.message || 'Supabase signin failed' };
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Supabase signin failed';
+        return { success: false, error: errorMsg };
       }
     }
 
@@ -292,7 +296,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Fallback search custom users in Local Storage
     const usersStr = localStorage.getItem('stadium_os_demo_users') || '[]';
     const users = JSON.parse(usersStr);
-    const foundUser = users.find((u: any) => u.email === email && u.password === password);
+    const foundUser = users.find((u: DemoUser) => u.email === email && u.password === password);
 
     if (!foundUser) {
       return { success: false, error: 'Invalid email or password. Use demo portal credentials (visitor@stadiumos.ai, staff@stadiumos.ai, or fifa@stadiumos.ai with password: stadiumos).' };
@@ -333,15 +337,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         if (error) return { success: false, error: error.message };
         return { success: true };
-      } catch (err: any) {
-        return { success: false, error: err.message || 'Supabase password reset failed' };
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Supabase password reset failed';
+        return { success: false, error: errorMsg };
       }
     }
 
     // Demo Mode Password Reset
     const usersStr = localStorage.getItem('stadium_os_demo_users') || '[]';
     const users = JSON.parse(usersStr);
-    const userExists = users.some((u: any) => u.email === email) || ['visitor@stadiumos.ai', 'staff@stadiumos.ai', 'fifa@stadiumos.ai', 'admin@stadiumos.ai'].includes(email);
+    const userExists = users.some((u: DemoUser) => u.email === email) || ['visitor@stadiumos.ai', 'staff@stadiumos.ai', 'fifa@stadiumos.ai', 'admin@stadiumos.ai'].includes(email);
 
     if (!userExists) {
       return { success: false, error: 'No user registered with this email address' };

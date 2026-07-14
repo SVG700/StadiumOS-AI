@@ -38,11 +38,14 @@ function SignupFormContent() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    if (roleParam && ROLE_OPTIONS.some(opt => opt.value === roleParam)) {
-      setRole(roleParam);
-    } else {
-      setRole('organizer');
-    }
+    const timer = setTimeout(() => {
+      if (roleParam && ROLE_OPTIONS.some(opt => opt.value === roleParam)) {
+        setRole(roleParam);
+      } else {
+        setRole('organizer');
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [roleParam]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -62,8 +65,9 @@ function SignupFormContent() {
       } else {
         setError(result.error || 'Account request failed.');
       }
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      setError(errorMsg);
     } finally {
       setIsLoading(false);
     }

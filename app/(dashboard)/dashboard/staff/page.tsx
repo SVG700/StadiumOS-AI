@@ -8,19 +8,52 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { 
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell 
-} from 'recharts';
+import dynamic from 'next/dynamic';
+
+const ResponsiveContainer = dynamic(
+  () => import('recharts').then((m) => m.ResponsiveContainer),
+  { ssr: false }
+);
+const BarChart = dynamic(
+  () => import('recharts').then((m) => m.BarChart),
+  { ssr: false }
+);
+const Bar = dynamic(
+  () => import('recharts').then((m) => m.Bar),
+  { ssr: false }
+);
+const XAxis = dynamic(
+  () => import('recharts').then((m) => m.XAxis),
+  { ssr: false }
+);
+const YAxis = dynamic(
+  () => import('recharts').then((m) => m.YAxis),
+  { ssr: false }
+);
+const Tooltip = dynamic(
+  () => import('recharts').then((m) => m.Tooltip),
+  { ssr: false }
+);
+const PieChart = dynamic(
+  () => import('recharts').then((m) => m.PieChart),
+  { ssr: false }
+);
+const Pie = dynamic(
+  () => import('recharts').then((m) => m.Pie),
+  { ssr: false }
+);
+const Cell = dynamic(
+  () => import('recharts').then((m) => m.Cell),
+  { ssr: false }
+);
 import { 
   Users, ShieldAlert, Activity, Bus, Accessibility, Clock, UserCheck, PlusCircle, 
-  AlertTriangle, RefreshCw, ClipboardList, AlertOctagon, CheckSquare, CheckCircle, Trophy, Sparkles
+  RefreshCw, ClipboardList, AlertOctagon, CheckSquare, CheckCircle, Trophy, Sparkles
 } from 'lucide-react';
 
 export default function StaffDashboard() {
   // Consume global synchronized context
   const {
-    stadiumHealth,
-    healthScore,
     crowdDensity,
     visitors,
     alerts,
@@ -734,7 +767,7 @@ export default function StaffDashboard() {
                   { value: 'critical', label: 'Critical Incident' }
                 ]}
                 value={alertSeverity}
-                onChange={e => setAlertSeverity(e.target.value as any)}
+                onChange={e => setAlertSeverity(e.target.value as 'low' | 'medium' | 'high' | 'critical')}
                 className="mt-1"
               />
             </div>
@@ -797,7 +830,7 @@ export default function StaffDashboard() {
                   { value: 'other', label: 'Other Special Help' }
                 ]}
                 value={accessType}
-                onChange={e => setAccessType(e.target.value as any)}
+                onChange={e => setAccessType(e.target.value as 'wheelchair' | 'sensory' | 'guide' | 'sign-language' | 'other')}
                 className="mt-1"
               />
             </div>
@@ -868,7 +901,7 @@ export default function StaffDashboard() {
                 { value: 'high', label: 'High Priority' }
               ]}
               value={taskPriority}
-              onChange={e => setTaskPriority(e.target.value as any)}
+              onChange={e => setTaskPriority(e.target.value as 'low' | 'medium' | 'high')}
               className="mt-1"
             />
           </div>

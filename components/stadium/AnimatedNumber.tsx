@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
 interface AnimatedNumberProps {
   value: number;
@@ -14,11 +14,12 @@ export const AnimatedNumber: React.FC<AnimatedNumberProps> = ({
   formatter = (val) => Math.round(val).toLocaleString() 
 }) => {
   const [displayValue, setDisplayValue] = useState(value);
+  const startValRef = useRef(value);
+  const endVal = value;
 
   useEffect(() => {
     let startTimestamp: number | null = null;
-    const startVal = displayValue;
-    const endVal = value;
+    const startVal = startValRef.current;
 
     if (startVal === endVal) return;
 
@@ -34,6 +35,7 @@ export const AnimatedNumber: React.FC<AnimatedNumberProps> = ({
         animFrameId = window.requestAnimationFrame(step);
       } else {
         setDisplayValue(endVal);
+        startValRef.current = endVal;
       }
     };
 
@@ -42,7 +44,12 @@ export const AnimatedNumber: React.FC<AnimatedNumberProps> = ({
     return () => {
       window.cancelAnimationFrame(animFrameId);
     };
-  }, [value, duration]);
+  }, [endVal, duration]);
+
+  // Keep track of the current value on render so that when it changes next time, we animate from the current displayed value
+  useEffect(() => {
+    startValRef.current = displayValue;
+  }, [displayValue]);
 
   return <span>{formatter(displayValue)}</span>;
 };

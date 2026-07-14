@@ -6,12 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { 
-  Map, Navigation, Locate, Eye, Compass, Info, Coffee, HelpCircle, 
-  MapPin, ShieldAlert, Crosshair, Users, Activity, LogOut, CheckSquare 
+  Map, Navigation, Locate, Compass, Info, Coffee, HelpCircle, 
+  MapPin, ShieldAlert
 } from 'lucide-react';
 
 export default function SmartNavigationPage() {
-  const { user } = useAuth();
+  useAuth();
   const [mounted, setMounted] = useState(false);
   const [activeHighlight, setActiveHighlight] = useState<'seat' | 'food' | 'restroom' | 'medical' | null>(null);
   
@@ -24,7 +24,7 @@ export default function SmartNavigationPage() {
   });
 
   useEffect(() => {
-    setMounted(true);
+    const timer = setTimeout(() => setMounted(true), 0);
 
     // Dynamic telemetry updates (simulating live system)
     const interval = setInterval(() => {
@@ -35,7 +35,10 @@ export default function SmartNavigationPage() {
       }));
     }, 15000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, []);
 
   if (!mounted) return null;

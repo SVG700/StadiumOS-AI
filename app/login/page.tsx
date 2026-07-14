@@ -2,15 +2,14 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Shield, Info, Users, Ticket, Building, Globe, Trophy, ArrowLeft } from 'lucide-react';
+import { Shield, Info, Ticket, Globe, ArrowLeft } from 'lucide-react';
 
 function LoginFormContent() {
   const { signIn, isDemoMode } = useAuth();
-  const router = useRouter();
   const searchParams = useSearchParams();
   
   // Initialize portal from query param, fallback to visitor
@@ -18,9 +17,12 @@ function LoginFormContent() {
   const [selectedPortal, setSelectedPortal] = useState<'visitor' | 'staff' | 'fifa'>('visitor');
 
   useEffect(() => {
-    if (portalParam && ['visitor', 'staff', 'fifa'].includes(portalParam)) {
-      setSelectedPortal(portalParam);
-    }
+    const timer = setTimeout(() => {
+      if (portalParam && ['visitor', 'staff', 'fifa'].includes(portalParam)) {
+        setSelectedPortal(portalParam);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [portalParam]);
 
   const [email, setEmail] = useState('');
@@ -30,22 +32,25 @@ function LoginFormContent() {
 
   // Auto-fill mock credentials when switching portals in demo mode
   useEffect(() => {
-    if (isDemoMode) {
-      if (selectedPortal === 'visitor') {
-        setEmail('visitor@stadiumos.ai');
-        setPassword('stadiumos');
-      } else if (selectedPortal === 'staff') {
-        setEmail('staff@stadiumos.ai');
-        setPassword('stadiumos');
-      } else if (selectedPortal === 'fifa') {
-        setEmail('fifa@stadiumos.ai');
-        setPassword('stadiumos');
+    const timer = setTimeout(() => {
+      if (isDemoMode) {
+        if (selectedPortal === 'visitor') {
+          setEmail('visitor@stadiumos.ai');
+          setPassword('stadiumos');
+        } else if (selectedPortal === 'staff') {
+          setEmail('staff@stadiumos.ai');
+          setPassword('stadiumos');
+        } else if (selectedPortal === 'fifa') {
+          setEmail('fifa@stadiumos.ai');
+          setPassword('stadiumos');
+        }
+      } else {
+        setEmail('');
+        setPassword('');
       }
-    } else {
-      setEmail('');
-      setPassword('');
-    }
-    setError(null);
+      setError(null);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [selectedPortal, isDemoMode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -63,8 +68,9 @@ function LoginFormContent() {
       if (!result.success) {
         setError(result.error || 'Login failed. Please check your credentials.');
       }
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      setError(errorMsg);
     } finally {
       setIsLoading(false);
     }

@@ -9,7 +9,7 @@ import { Select } from '@/components/ui/select';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { playSynthTone } from '@/lib/audio';
 import { 
-  Settings, Shield, Server, Bot, EyeOff, Save, CheckCircle, Info, Volume2, VolumeX, 
+  Settings, Shield, Server, Bot, Save, CheckCircle, Info, Volume2, 
   Accessibility, Languages, Eye, Layout, Type
 } from 'lucide-react';
 
@@ -31,12 +31,15 @@ export default function SettingsPage() {
   // Load from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setSoundEnabled(localStorage.getItem('stadium_sound_enabled') === 'true');
-      setAnimationsEnabled(localStorage.getItem('stadium_animations_enabled') !== 'false');
-      setTheme(localStorage.getItem('stadium_theme') || 'glassmorphism');
-      setLanguage(localStorage.getItem('stadium_language') || 'en');
-      setHighContrast(localStorage.getItem('stadium_high_contrast') === 'true');
-      setFontSize(localStorage.getItem('stadium_font_size') || 'medium');
+      const timer = setTimeout(() => {
+        setSoundEnabled(localStorage.getItem('stadium_sound_enabled') === 'true');
+        setAnimationsEnabled(localStorage.getItem('stadium_animations_enabled') !== 'false');
+        setTheme(localStorage.getItem('stadium_theme') || 'glassmorphism');
+        setLanguage(localStorage.getItem('stadium_language') || 'en');
+        setHighContrast(localStorage.getItem('stadium_high_contrast') === 'true');
+        setFontSize(localStorage.getItem('stadium_font_size') || 'medium');
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, []);
 

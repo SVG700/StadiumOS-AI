@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -8,8 +8,8 @@ import { StadiumProvider, useStadium } from '@/components/stadium/StadiumContext
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, Map, Users, Bus, Accessibility, Leaf, ShieldAlert, Bot, Settings, LogOut,
-  Menu, X, Server, User, Shield, Ticket, Globe, Trophy, Bell, Search, Info, Check, Trash2, Calendar,
-  Sparkles, ShieldCheck, Activity, Terminal, RefreshCw, Zap, Undo2
+  Menu, X, User, Shield, Ticket, Trophy, Bell, Search, Check, Trash2,
+  ShieldCheck, Activity, Terminal, Undo2, HelpCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +18,7 @@ import { Dialog } from '@/components/ui/dialog';
 interface SidebarItem {
   name: string;
   href: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<{ className?: string }>;
 }
 
 const VISITOR_ITEMS: SidebarItem[] = [
@@ -104,7 +104,7 @@ const getAllowedRoutes = (role: string): string[] => {
 };
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
-  const { user, signOut, isLoading } = useAuth();
+  const { user, signOut, isLoading, isDemoMode } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -116,12 +116,21 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<typeof SEARCH_DATABASE>([]);
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    return SEARCH_DATABASE.filter(
+      (item) => item.term.toLowerCase().includes(q) || item.description.toLowerCase().includes(q)
+    );
+  }, [searchQuery]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   
   // Notification states
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifFilter, setNotifFilter] = useState<'all' | 'operational' | 'transport' | 'medical' | 'security' | 'visitor'>('all');
+
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isDiagOpen, setIsDiagOpen] = useState(false);
 
   // Command Palette states
   const [isCommandOpen, setIsCommandOpen] = useState(false);
@@ -174,18 +183,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Search filter
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      return;
-    }
-    const q = searchQuery.toLowerCase();
-    const filtered = SEARCH_DATABASE.filter(
-      (item) => item.term.toLowerCase().includes(q) || item.description.toLowerCase().includes(q)
-    );
-    setSearchResults(filtered);
-  }, [searchQuery]);
+  // Search query filter is handled reactively via useMemo
 
   const handleSearchResultClick = (path: string) => {
     router.push(path);
@@ -359,11 +357,33 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
               <p className="text-[10px] text-slate-400 truncate">{getRoleLabel(user.role)}</p>
             </div>
           </div>
+          {isDemoMode && (
+            <div className="mt-3 p-2.5 rounded-lg bg-cyan-950/25 border border-cyan-900/40 text-[10px] space-y-1">
+              <span className="font-bold text-cyan-400 block flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                Demo Environment Active
+              </span>
+              <span className="text-[9px] text-slate-400 block leading-tight">
+                • No real stadium systems affected<br />
+                • AI-generated telemetry<br />
+                • Simulated FIFA environment
+              </span>
+            </div>
+          )}
+          <div className="mt-3 pt-2.5 border-t border-slate-900/60 text-[9px] font-mono text-slate-500 space-y-0.5 select-none">
+            <div className="flex justify-between"><span>Node Sync:</span><span className="text-emerald-400">LIVE</span></div>
+            <div className="flex justify-between"><span>Uptime:</span><span className="text-slate-300">99.98%</span></div>
+            <div className="flex justify-between"><span>Build Version:</span><span className="text-slate-300">v1.2.0-rc4</span></div>
+            <div className="flex justify-between"><span>Environment:</span><span className="text-slate-300">FIFA Node</span></div>
+            <div className="flex justify-between"><span>Latency:</span><span className="text-emerald-400">14ms</span></div>
+            <div className="flex justify-between"><span>Active Modules:</span><span className="text-slate-300">Twin, Synth</span></div>
+            <div className="flex justify-between"><span>Region:</span><span className="text-slate-300">CONCACAF</span></div>
+          </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => signOut()}
-            className="w-full justify-start text-xs text-slate-400 hover:text-red-400 hover:bg-red-950/15"
+            className="w-full justify-start text-xs text-slate-400 hover:text-red-400 hover:bg-red-950/15 mt-3"
           >
             <LogOut className="mr-2.5 h-3.5 w-3.5" />
             Sign Out Session
@@ -420,9 +440,30 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                   );
                 })}
               </nav>
-
               <div className="p-4 border-t border-slate-900/80 bg-slate-950/20">
-                <Button variant="ghost" size="sm" onClick={() => signOut()} className="w-full justify-start text-xs text-slate-400 hover:text-red-400">
+                {isDemoMode && (
+                  <div className="mt-3 p-2.5 rounded-lg bg-cyan-950/25 border border-cyan-900/40 text-[10px] space-y-1">
+                    <span className="font-bold text-cyan-400 block flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                      Demo Environment Active
+                    </span>
+                    <span className="text-[9px] text-slate-400 block leading-tight">
+                      • No real stadium systems affected<br />
+                      • AI-generated telemetry<br />
+                      • Simulated FIFA environment
+                    </span>
+                  </div>
+                )}
+                <div className="mt-3 pt-2.5 border-t border-slate-900/60 text-[9px] font-mono text-slate-500 space-y-0.5 select-none">
+                  <div className="flex justify-between"><span>Node Sync:</span><span className="text-emerald-400">LIVE</span></div>
+                  <div className="flex justify-between"><span>Uptime:</span><span className="text-slate-300">99.98%</span></div>
+                  <div className="flex justify-between"><span>Build Version:</span><span className="text-slate-300">v1.2.0-rc4</span></div>
+                  <div className="flex justify-between"><span>Environment:</span><span className="text-slate-300">FIFA Node</span></div>
+                  <div className="flex justify-between"><span>Latency:</span><span className="text-emerald-400">14ms</span></div>
+                  <div className="flex justify-between"><span>Active Modules:</span><span className="text-slate-300">Twin, Synth</span></div>
+                  <div className="flex justify-between"><span>Region:</span><span className="text-slate-300">CONCACAF</span></div>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => signOut()} className="w-full justify-start text-xs text-slate-400 hover:text-red-400 mt-3">
                   <LogOut className="mr-2 h-3.5 w-3.5" />
                   Sign Out Session
                 </Button>
@@ -501,6 +542,28 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Diagnostics Panel Button */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setIsDiagOpen(true)} 
+              className="text-slate-400 hover:text-cyan-400 rounded-xl cursor-pointer"
+              aria-label="Console system diagnostics"
+            >
+              <Activity className="h-4.5 w-4.5" />
+            </Button>
+
+            {/* Help Center Button */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setIsHelpOpen(true)} 
+              className="text-slate-400 hover:text-cyan-400 rounded-xl cursor-pointer"
+              aria-label="Console help center"
+            >
+              <HelpCircle className="h-4.5 w-4.5" />
+            </Button>
+
             {/* Notification Bell */}
             <div ref={notifRef} className="relative">
               <Button variant="ghost" size="icon" onClick={() => setIsNotifOpen(!isNotifOpen)} className="relative text-slate-400 hover:text-white rounded-xl">
@@ -772,6 +835,81 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Global Help Center Modal */}
+      <Dialog
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
+        title="StadiumOS Global Help Center"
+        description="FIFA World Cup 2026 Operations Console Guide."
+      >
+        <div className="space-y-4 max-h-96 overflow-y-auto pr-1 text-xs text-slate-300">
+          <div className="space-y-1.5">
+            <span className="font-bold text-cyan-400 block uppercase tracking-wider font-mono text-[9px]">⌨ Keyboard Shortcuts</span>
+            <div className="grid grid-cols-2 gap-2 bg-slate-950/70 p-2.5 rounded border border-slate-900 font-mono text-[10px]">
+              <div>Press <kbd className="bg-slate-900 border border-slate-800 px-1 py-0.2 rounded text-[10px]">Ctrl + K</kbd></div>
+              <div>Toggle Command Palette</div>
+              <div>Press <kbd className="bg-slate-900 border border-slate-800 px-1 py-0.2 rounded text-[10px]">Esc</kbd></div>
+              <div>Close Active Dialogs</div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5 border-t border-slate-900/60 pt-3">
+            <span className="font-bold text-cyan-400 block uppercase tracking-wider font-mono text-[9px]">👤 User Role Reference</span>
+            <div className="space-y-2 leading-relaxed text-slate-400">
+              <div><strong>Visitor Portal</strong>: Intended for matchday fans. Features crowd status guides, seating maps, and weather alerts.</div>
+              <div><strong>Staff Operations Desk</strong>: For stadium coordinators. Allocates volunteers, claims assistance requests, and logs alerts.</div>
+              <div><strong>FIFA Board Room</strong>: For World Cup commissioners. Coordinates multi-stadium matches, monitors playbooks, and runs Twin simulator logs.</div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5 border-t border-slate-900/60 pt-3">
+            <span className="font-bold text-cyan-400 block uppercase tracking-wider font-mono text-[9px]">🤖 AI Assistant & Emergency Playbooks</span>
+            <div className="space-y-1.5 leading-relaxed text-slate-400">
+              <p>Type commands inside the assistant or command palette (e.g. *&quot;Heavy rain forecast in Vancouver&quot;*) to preview AI recommendations. Press **Approve** to deploy direct visual updates.</p>
+              <p>Playbooks trigger bundled actions instantly to handle high congestion, medical emergencies, or solar load grid limits.</p>
+            </div>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Diagnostics Dialog */}
+      <Dialog
+        isOpen={isDiagOpen}
+        onClose={() => setIsDiagOpen(false)}
+        title="Console System Diagnostics"
+        description="Sub-system telemetry nodes status reports."
+      >
+        <div className="space-y-4 text-xs">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-lg border border-slate-900 bg-slate-950/60 space-y-0.5">
+              <span className="text-[9px] text-slate-500 font-bold block font-mono">CPU MEMORY USE</span>
+              <span className="text-md font-black text-white font-mono">124 MB / 512 MB</span>
+            </div>
+            <div className="p-3 rounded-lg border border-slate-900 bg-slate-950/60 space-y-0.5">
+              <span className="text-[9px] text-slate-500 font-bold block font-mono">RESPONSE LATENCY</span>
+              <span className="text-md font-black text-emerald-400 font-mono">14 ms</span>
+            </div>
+          </div>
+
+          <div className="space-y-2 border-t border-slate-900/60 pt-3 text-[11px]">
+            <span className="text-[9px] text-slate-500 font-bold block font-mono uppercase">Node Services Registry</span>
+            {[
+              { label: 'AI Engine Pipeline (v1.1.2)', status: 'Nominal', color: 'text-emerald-400' },
+              { label: 'Database Telemetry Ledger', status: 'Nominal', color: 'text-emerald-400' },
+              { label: 'Live Weather Feed Service', status: 'Nominal', color: 'text-emerald-400' },
+              { label: 'CONCACAF Transit API', status: 'Nominal', color: 'text-emerald-400' },
+              { label: 'Emergency Beacon Network', status: 'Degraded', color: 'text-amber-400 animate-pulse' },
+              { label: 'PWA Offline Storage Cache', status: 'Active (1.8MB)', color: 'text-emerald-400' }
+            ].map((srv, idx) => (
+              <div key={idx} className="flex justify-between items-center py-1 border-b border-slate-900/40 font-mono">
+                <span className="text-slate-400">{srv.label}</span>
+                <span className={`font-bold ${srv.color}`}>● {srv.status}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Dialog>
 
     </div>
   );
