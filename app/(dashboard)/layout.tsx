@@ -594,6 +594,27 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
+        {/* Command Center Status Ribbon */}
+        <div className="flex flex-wrap items-center bg-[#070b14]/85 border-b border-slate-900 px-6 py-2.5 gap-4.5 text-[10.5px] font-mono select-none overflow-x-auto shrink-0 scrollbar-none">
+          <span className="text-slate-500 font-bold uppercase tracking-wider text-[8px] mr-2 flex items-center gap-1.5 shrink-0">
+            <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+            CONSOLE STATUS:
+          </span>
+          {[
+            { label: 'AI Engine', status: 'Healthy', color: 'text-emerald-400' },
+            { label: 'Database', status: 'Healthy', color: 'text-emerald-400' },
+            { label: 'Weather Feed', status: 'Healthy', color: 'text-emerald-400' },
+            { label: 'Transport API', status: 'Healthy', color: 'text-emerald-400' },
+            { label: 'Indoor Navigation', status: 'Healthy', color: 'text-emerald-400' },
+            { label: 'Emergency Network', status: 'Degraded', color: 'text-amber-400 animate-pulse' }
+          ].map((srv, idx) => (
+            <div key={idx} className="flex items-center gap-1.5 shrink-0">
+              <span className="text-slate-400">{srv.label}:</span>
+              <span className={`font-black ${srv.color}`}>● {srv.status}</span>
+            </div>
+          ))}
+        </div>
+
         <main className="flex-1 overflow-y-auto bg-[#05070c] p-6 focus:outline-none" tabIndex={-1}>
           {children}
         </main>

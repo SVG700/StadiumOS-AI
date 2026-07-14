@@ -1,12 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { Settings, Shield, Server, Bot, EyeOff, Save, CheckCircle, Info } from 'lucide-react';
+import { playSynthTone } from '@/lib/audio';
+import { 
+  Settings, Shield, Server, Bot, EyeOff, Save, CheckCircle, Info, Volume2, VolumeX, 
+  Accessibility, Languages, Eye, Layout, Type
+} from 'lucide-react';
 
 export default function SettingsPage() {
   const { user, isDemoMode } = useAuth();
@@ -15,8 +20,42 @@ export default function SettingsPage() {
   const [profileName, setProfileName] = useState(user?.name || '');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Preference States
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [animationsEnabled, setAnimationsEnabled] = useState(true);
+  const [theme, setTheme] = useState('glassmorphism');
+  const [language, setLanguage] = useState('en');
+  const [highContrast, setHighContrast] = useState(false);
+  const [fontSize, setFontSize] = useState('medium');
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setSoundEnabled(localStorage.getItem('stadium_sound_enabled') === 'true');
+      setAnimationsEnabled(localStorage.getItem('stadium_animations_enabled') !== 'false');
+      setTheme(localStorage.getItem('stadium_theme') || 'glassmorphism');
+      setLanguage(localStorage.getItem('stadium_language') || 'en');
+      setHighContrast(localStorage.getItem('stadium_high_contrast') === 'true');
+      setFontSize(localStorage.getItem('stadium_font_size') || 'medium');
+    }
+  }, []);
+
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Save to localStorage
+    localStorage.setItem('stadium_sound_enabled', String(soundEnabled));
+    localStorage.setItem('stadium_animations_enabled', String(animationsEnabled));
+    localStorage.setItem('stadium_theme', theme);
+    localStorage.setItem('stadium_language', language);
+    localStorage.setItem('stadium_high_contrast', String(highContrast));
+    localStorage.setItem('stadium_font_size', fontSize);
+
+    // Play chirp feedback if enabled
+    if (soundEnabled) {
+      setTimeout(() => playSynthTone('notification'), 100);
+    }
+
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
@@ -71,46 +110,181 @@ export default function SettingsPage() {
               <CardDescription className="text-xs">Manage device caches and logs</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button variant="outline" size="sm" className="w-full text-xs border-slate-800 bg-[#0c101d] text-slate-300">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  localStorage.clear();
+                  window.location.reload();
+                }}
+                className="w-full text-xs border-slate-800 bg-[#0c101d] text-slate-300 cursor-pointer"
+              >
                 Purge Offline Storage
-              </Button>
-              <Button variant="outline" size="sm" className="w-full text-xs border-slate-800 bg-[#0c101d] text-slate-300">
-                Download Audit Log
               </Button>
             </CardContent>
           </Card>
         </div>
 
-        {/* Right Side: Environment Keys Status */}
+        {/* Right Side: Configuration Forms */}
         <div className="md:col-span-2 space-y-6">
-          {/* Config Forms */}
           <Card className="bg-[#080d19]/30 border-slate-900/60">
             <CardHeader>
-              <CardTitle className="text-sm font-semibold">Clearance Profile Details</CardTitle>
-              <CardDescription className="text-xs">Update your local profile name identifier.</CardDescription>
+              <CardTitle className="text-sm font-semibold">Console Preferences</CardTitle>
+              <CardDescription className="text-xs">Configure audio, UI feedback, and theme variables.</CardDescription>
             </CardHeader>
             <form onSubmit={handleSaveSettings}>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-5">
+                
+                {/* Identifier Profile name */}
                 <div>
                   <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Staff Identifier Name</label>
                   <Input 
                     value={profileName} 
                     onChange={e => setProfileName(e.target.value)} 
-                    className="mt-1.5"
+                    className="mt-1.5 text-xs bg-slate-950/60"
                     required 
                   />
                 </div>
+
+                {/* Sounds Synth config */}
+                <div className="flex items-center justify-between p-3.5 rounded-lg border border-slate-800 bg-slate-950/20">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <Volume2 className="h-4 w-4 text-cyan-400" />
+                      Operations Audio Synth
+                    </span>
+                    <span className="text-[10px] text-slate-400 block">Enables high-fidelity synthesiser audio cues on task actions.</span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Button
+                      type="button"
+                      variant={soundEnabled ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSoundEnabled(true)}
+                      className="text-xs h-7.5 px-3 cursor-pointer"
+                    >
+                      On
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={!soundEnabled ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSoundEnabled(false)}
+                      className="text-xs h-7.5 px-3 cursor-pointer"
+                    >
+                      Mute
+                    </Button>
+                  </div>
+                </div>
+
+                {/* UI Animations toggle */}
+                <div className="flex items-center justify-between p-3.5 rounded-lg border border-slate-800 bg-slate-950/20">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <Layout className="h-4 w-4 text-cyan-400" />
+                      Transitions & Stagger Animations
+                    </span>
+                    <span className="text-[10px] text-slate-400 block">Toggles dashboard fade transitions and slider counters.</span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Button
+                      type="button"
+                      variant={animationsEnabled ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setAnimationsEnabled(true)}
+                      className="text-xs h-7.5 px-3 cursor-pointer"
+                    >
+                      Enable
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={!animationsEnabled ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setAnimationsEnabled(false)}
+                      className="text-xs h-7.5 px-3 cursor-pointer"
+                    >
+                      Disable
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Grid Selectors */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
+                      <Languages className="h-3.5 w-3.5 text-cyan-400" />
+                      System Language
+                    </label>
+                    <Select
+                      options={[
+                        { value: 'en', label: 'English (US/UK)' },
+                        { value: 'es', label: 'Español (ES/MX)' },
+                        { value: 'fr', label: 'Français (FR)' },
+                        { value: 'de', label: 'Deutsch' }
+                      ]}
+                      value={language}
+                      onChange={e => setLanguage(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
+                      <Accessibility className="h-3.5 w-3.5 text-cyan-400" />
+                      High Contrast Mode
+                    </label>
+                    <Select
+                      options={[
+                        { value: 'false', label: 'Contrast: Normal' },
+                        { value: 'true', label: 'Contrast: High Contrast' }
+                      ]}
+                      value={highContrast ? 'true' : 'false'}
+                      onChange={e => setHighContrast(e.target.value === 'true')}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
+                      <Type className="h-3.5 w-3.5 text-cyan-400" />
+                      Display Font Size
+                    </label>
+                    <Select
+                      options={[
+                        { value: 'small', label: 'Text Size: Small' },
+                        { value: 'medium', label: 'Text Size: Medium' },
+                        { value: 'large', label: 'Text Size: Large' }
+                      ]}
+                      value={fontSize}
+                      onChange={e => setFontSize(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
+                      <Eye className="h-3.5 w-3.5 text-cyan-400" />
+                      UI Aesthetic Theme
+                    </label>
+                    <Select
+                      options={[
+                        { value: 'glassmorphism', label: 'Glassmorphic Dark' },
+                        { value: 'flat-dark', label: 'Flat Charcoal Dark' }
+                      ]}
+                      value={theme}
+                      onChange={e => setTheme(e.target.value)}
+                    />
+                  </div>
+                </div>
+
               </CardContent>
-              <CardFooter className="flex justify-between items-center border-t border-slate-900/60 pt-4 p-6">
+              <CardFooter className="flex justify-between items-center border-t border-slate-900/60 pt-4 p-6 bg-slate-950/15">
                 {saveSuccess ? (
-                  <span className="text-xs text-emerald-400 flex items-center gap-1.5">
-                    <CheckCircle className="h-4 w-4" /> Changes applied locally!
+                  <span className="text-xs text-emerald-400 flex items-center gap-1.5 font-bold">
+                    <CheckCircle className="h-4 w-4" /> Preferences applied successfully!
                   </span>
                 ) : (
                   <span />
                 )}
-                <Button type="submit" size="sm" className="flex items-center gap-1.5">
-                  <Save className="h-3.5 w-3.5" /> Save Changes
+                <Button type="submit" size="sm" className="flex items-center gap-1.5 bg-cyan-600 hover:bg-cyan-700 text-white cursor-pointer font-bold h-8.5 px-4 rounded-lg">
+                  <Save className="h-3.5 w-3.5" /> Save Preferences
                 </Button>
               </CardFooter>
             </form>

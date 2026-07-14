@@ -12,6 +12,7 @@ import {
   Map, ArrowUpRight, Compass, FlameKindling, Navigation, Smile, Coffee, HelpCircle, Trophy, Info, Sun, CloudRain
 } from 'lucide-react';
 import Link from 'next/link';
+import { AnimatedNumber } from '@/components/stadium/AnimatedNumber';
 
 export default function VisitorDashboard() {
   const { user } = useAuth();
@@ -88,7 +89,7 @@ export default function VisitorDashboard() {
               </div>
               <div className="p-3 rounded-lg border border-slate-800 bg-[#070b13]/30">
                 <span className="text-slate-400 block text-[10px] uppercase font-mono tracking-wider mb-0.5">Stadium Seating</span>
-                <span className="text-slate-200 font-bold">{match.attendance.toLocaleString()} Attendance</span>
+                <span className="text-slate-200 font-bold"><AnimatedNumber value={match.attendance} /> Attendance</span>
               </div>
             </div>
 
@@ -117,7 +118,7 @@ export default function VisitorDashboard() {
           <CardContent className="pt-2 space-y-4 flex-1 flex flex-col justify-between">
             <div className="flex justify-between items-center text-center p-4 rounded-xl border border-slate-900 bg-slate-950/50">
               <div className="flex-1">
-                <span className="text-3xl font-black text-white">{weather.temp}°C</span>
+                <span className="text-3xl font-black text-white"><AnimatedNumber value={weather.temp} />°C</span>
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mt-1">Temperature</span>
               </div>
               <div className="w-px h-10 bg-slate-800" />

@@ -1,10 +1,11 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { 
   CrowdDensity, ActiveVisitors, EmergencyAlert, TransportStatus, 
   AccessibilityRequest, SustainabilityMetrics, VolunteerActivity 
 } from '@/types';
+import { playSynthTone } from '@/lib/audio';
 
 export interface TaskAssignment {
   id: string;
@@ -71,15 +72,47 @@ export interface StadiumPrediction {
   reasoning: string[];
 }
 
+export type MatchPhase = 'pre-match' | 'kickoff' | 'first-half' | 'halftime' | 'second-half' | 'full-time' | 'exit-phase' | 'venue-closed';
+
+export interface SimulatedIncident {
+  id: string;
+  title: string;
+  type: 'security' | 'medical' | 'transport' | 'operational';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  location: string;
+  timestamp: string;
+  recommendedResponse: string;
+  estimatedImpact: string;
+  aiConfidence: number;
+  expectedResolutionTime: string;
+  status: 'detected' | 'assigned' | 'responding' | 'contained' | 'resolved' | 'archived';
+  progress: number; // 0 to 100
+  afterActionReport: AfterActionReport | null;
+}
+
+export interface AfterActionReport {
+  id: string;
+  title: string;
+  summary: string;
+  timeline: Array<{ time: string; event: string }>;
+  departments: string[];
+  aiActions: string[];
+  humanActions: string[];
+  resolutionTime: string;
+  lessonsLearned: string;
+  futureRecommendation: string;
+}
+
 export interface StadiumData {
   id: string;
   name: string;
   city: string;
   location: string;
-  xPercent: number; // Relative map x
-  yPercent: number; // Relative map y
+  xPercent: number; 
+  yPercent: number; 
   healthScore: number;
   stadiumHealth: 'Excellent' | 'Good' | 'Warning' | 'Critical';
+  matchPhase: MatchPhase;
   crowdDensity: CrowdDensity[];
   visitors: ActiveVisitors;
   alerts: EmergencyAlert[];
@@ -92,6 +125,7 @@ export interface StadiumData {
   weather: StadiumWeather;
   match: StadiumMatch;
   predictions: StadiumPrediction[];
+  simulatedIncidents: SimulatedIncident[];
 }
 
 export interface OperationHistoryItem {
@@ -159,11 +193,28 @@ interface StadiumContextType {
   refreshTransit: () => void;
   clearNotifications: () => void;
   markNotificationRead: (id: string) => void;
+  // Match phase commands
+  changeMatchPhase: (phase: MatchPhase) => void;
+  // Command playbooks
+  executePlaybook: (playbookId: string) => Promise<void>;
+  // Manual trigger simulation
+  triggerRandomIncident: () => void;
+  // Live indexes
+  resilienceScore: number;
+  fanExperienceScore: 'Excellent' | 'Good' | 'Fair' | 'Poor';
+  fanExperienceBreakdown: {
+    queues: number;
+    navigation: number;
+    accessibility: number;
+    food: number;
+    restrooms: number;
+    weather: number;
+  };
 }
 
 const StadiumContext = createContext<StadiumContextType | undefined>(undefined);
 
-// Initial Stadium templates
+// Initial templates
 const INITIAL_STADIUMS: StadiumData[] = [
   {
     id: 'vancouver',
@@ -174,6 +225,7 @@ const INITIAL_STADIUMS: StadiumData[] = [
     yPercent: 26,
     healthScore: 82,
     stadiumHealth: 'Warning',
+    matchPhase: 'first-half',
     crowdDensity: [
       { zone: 'Zone A (Gate 1-3)', density: 78, capacity: 15000, currentCount: 11700, status: 'high' },
       { zone: 'Zone B (Gate 4-6)', density: 45, capacity: 15000, currentCount: 6750, status: 'moderate' },
@@ -186,28 +238,20 @@ const INITIAL_STADIUMS: StadiumData[] = [
     alerts: [
       { id: 'alert-1', title: 'Crowd Congestion at Gate 3', description: 'High traffic density slowing entry. Re-routing incoming fans to Gate 4.', severity: 'medium', location: 'Gate 3 Turnstiles', timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(), status: 'active', assignedTeam: 'Crowd Control Alpha' },
       { id: 'alert-2', title: 'Elevator Outage', description: 'Elevator EL-4 in West Stand is unresponsive. Technician dispatched.', severity: 'low', location: 'West Stand (Level 2)', timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(), status: 'investigating', assignedTeam: 'Maintenance Team B' },
-      { id: 'alert-3', title: 'Medical Assistance Required', description: 'Spectator experiencing heat exhaustion in Section 104.', severity: 'high', location: 'Section 104, Row K', timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(), status: 'active', assignedTeam: 'Medical Response 1' },
     ],
     transport: [
       { id: 't-1', mode: 'metro', lineName: 'Stadium Express (Line 1)', status: 'on-time', etaMinutes: 4, occupancy: 'high' },
       { id: 't-2', mode: 'bus', lineName: 'Downtown Shuttle (Route A)', status: 'delayed', etaMinutes: 12, occupancy: 'medium', delayReason: 'Traffic near Expressway' },
-      { id: 't-3', mode: 'shuttle', lineName: 'West Parking Lot Transfer', status: 'on-time', etaMinutes: 3, occupancy: 'low' },
     ],
     accessibility: [
       { id: 'req-1', userEmail: 'fan1@example.com', requestType: 'wheelchair', location: 'Gate 1 Drop-off Zone', status: 'in-progress', timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(), assignedStaff: 'Volunteer Sarah M.' },
-      { id: 'req-2', userEmail: 'fan2@example.com', requestType: 'sensory', location: 'Suite 24 Entrance', status: 'pending', timestamp: new Date(Date.now() - 2 * 60 * 1000).toISOString() },
     ],
     sustainability: { energyUsageKw: 4200, renewablePercentage: 86, carbonOffsetKg: 3240, wasteRecycledKg: 1480, waterSavedLitres: 12400 },
     volunteers: [
       { id: 'v-1', name: 'Marcus Vance', task: 'Crowd Directing', location: 'Gate 3', status: 'on-duty', checkInTime: '15:30' },
-      { id: 'v-2', name: 'Elena Rostova', task: 'Medical Aid Post B', location: 'Section 112', status: 'on-duty', checkInTime: '16:00' },
     ],
-    tasks: [
-      { id: 't1', title: 'Verify wheelchair ramp deployment', assignee: 'Jane (Volunteer)', priority: 'medium', status: 'pending', location: 'Gate 4 North' },
-    ],
-    incidents: [
-      { id: 'i1', issue: 'Spill reported near concession POD 3', reporter: 'Fan (reported via AI)', status: 'open', time: '5m ago' }
-    ],
+    tasks: [],
+    incidents: [],
     weather: { temp: 31, humidity: 62, wind: 14, uv: 9, rainProb: 15, aqi: 48, heatRisk: 'High' },
     match: {
       teamA: 'Argentina',
@@ -223,8 +267,24 @@ const INITIAL_STADIUMS: StadiumData[] = [
       broadcastViewers: 12.4
     },
     predictions: [
-      { id: 'p1', message: 'Gate 3 queue likely to exceed capacity in 12 minutes.', confidence: 92, impact: 'Heavy bottleneck, wait times +15m', action: 'Open Gate 4 turnstiles immediately', risk: 'Medium', reasoning: ['Inflow volume +18% past 10m', 'Ticket scan processing lag', 'Historical Quarter Final queue pattern'] },
-      { id: 'p2', message: 'Parking Lot C will reach full capacity in 18 minutes.', confidence: 88, impact: 'Incoming congestion on North Blvd', action: 'Redirect vehicles to West Parking Zone', risk: 'Low', reasoning: ['GPS traffic logs show 340 cars inbound', 'Current occupancy at 94%'] }
+      { id: 'p1', message: 'Gate 3 queue likely to exceed capacity in 12 minutes.', confidence: 92, impact: 'Heavy bottleneck, wait times +15m', action: 'Open Gate 4 turnstiles immediately', risk: 'Medium', reasoning: ['Inflow volume +18% past 10m', 'Ticket scan processing lag', 'Historical Quarter Final queue pattern'] }
+    ],
+    simulatedIncidents: [
+      {
+        id: 'sim-inc-1',
+        title: 'Elevator Escalator Failure',
+        type: 'operational',
+        severity: 'medium',
+        location: 'Section 104 Elevator Lobby',
+        timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+        recommendedResponse: 'Dispatch Maintenance Crew and assign temporary accessibility guides.',
+        estimatedImpact: 'Disabled fan delays +20 mins',
+        aiConfidence: 94,
+        expectedResolutionTime: '15 mins',
+        status: 'responding',
+        progress: 35,
+        afterActionReport: null
+      }
     ]
   },
   {
@@ -236,10 +296,10 @@ const INITIAL_STADIUMS: StadiumData[] = [
     yPercent: 54,
     healthScore: 74,
     stadiumHealth: 'Critical',
+    matchPhase: 'pre-match',
     crowdDensity: [
       { zone: 'Zone A (Gate 1-3)', density: 60, capacity: 20000, currentCount: 12000, status: 'moderate' },
-      { zone: 'Zone B (Gate 4-6)', density: 95, capacity: 20000, currentCount: 19000, status: 'critical' },
-      { zone: 'Zone C (Concourse)', density: 85, capacity: 15000, currentCount: 12750, status: 'high' }
+      { zone: 'Zone B (Gate 4-6)', density: 95, capacity: 20000, currentCount: 19000, status: 'critical' }
     ],
     visitors: { total: 72100, fans: 68900, staff: 2900, vip: 300 },
     alerts: [
@@ -267,9 +327,8 @@ const INITIAL_STADIUMS: StadiumData[] = [
       parkingOccupancy: 96,
       broadcastViewers: 18.2
     },
-    predictions: [
-      { id: 'la-p1', message: 'Gate 5 bottleneck risk critical in 8 minutes.', confidence: 96, impact: 'Gridlock near main escalators', action: 'Deploy Crowd Control Bravo', risk: 'High', reasoning: ['Gate 5 scan rate at peak capacity', 'Escalator sensor reports load limit'] }
-    ]
+    predictions: [],
+    simulatedIncidents: []
   },
   {
     id: 'new-york',
@@ -280,15 +339,13 @@ const INITIAL_STADIUMS: StadiumData[] = [
     yPercent: 38,
     healthScore: 96,
     stadiumHealth: 'Excellent',
+    matchPhase: 'first-half',
     crowdDensity: [
-      { zone: 'Zone A', density: 40, capacity: 25000, currentCount: 10000, status: 'low' },
-      { zone: 'Zone B', density: 50, capacity: 25000, currentCount: 12500, status: 'moderate' }
+      { zone: 'Zone A', density: 40, capacity: 25000, currentCount: 10000, status: 'low' }
     ],
     visitors: { total: 80200, fans: 76000, staff: 3500, vip: 700 },
     alerts: [],
-    transport: [
-      { id: 'ny-t-1', mode: 'train', lineName: 'NJ Transit Meadowlands Rail', status: 'on-time', etaMinutes: 5, occupancy: 'high' }
-    ],
+    transport: [],
     accessibility: [],
     sustainability: { energyUsageKw: 6200, renewablePercentage: 88, carbonOffsetKg: 5200, wasteRecycledKg: 2800, waterSavedLitres: 24000 },
     volunteers: [],
@@ -308,9 +365,8 @@ const INITIAL_STADIUMS: StadiumData[] = [
       parkingOccupancy: 78,
       broadcastViewers: 22.4
     },
-    predictions: [
-      { id: 'ny-p1', message: 'Concession queue peaks at halftime.', confidence: 85, impact: 'Wait times +8 mins', action: 'Activate secondary concession POS', risk: 'Low', reasoning: ['Halftime purchase history', 'Pre-match food sales tracker'] }
-    ]
+    predictions: [],
+    simulatedIncidents: []
   },
   {
     id: 'dallas',
@@ -321,9 +377,8 @@ const INITIAL_STADIUMS: StadiumData[] = [
     yPercent: 65,
     healthScore: 90,
     stadiumHealth: 'Good',
-    crowdDensity: [
-      { zone: 'Zone A', density: 65, capacity: 30000, currentCount: 19500, status: 'moderate' }
-    ],
+    matchPhase: 'pre-match',
+    crowdDensity: [],
     visitors: { total: 88200, fans: 84000, staff: 3800, vip: 400 },
     alerts: [],
     transport: [],
@@ -346,9 +401,8 @@ const INITIAL_STADIUMS: StadiumData[] = [
       parkingOccupancy: 88,
       broadcastViewers: 29.5
     },
-    predictions: [
-      { id: 'dl-p1', message: 'AC load peak demands grid battery activation.', confidence: 91, impact: 'Utility spikes cost +15%', action: 'Deploy Battery Reserve grid optimization', risk: 'Low', reasoning: ['Ambient temp 33C', 'Retractable roof closed logs'] }
-    ]
+    predictions: [],
+    simulatedIncidents: []
   },
   {
     id: 'toronto',
@@ -359,6 +413,7 @@ const INITIAL_STADIUMS: StadiumData[] = [
     yPercent: 32,
     healthScore: 94,
     stadiumHealth: 'Excellent',
+    matchPhase: 'halftime',
     crowdDensity: [],
     visitors: { total: 42100, fans: 39500, staff: 2300, vip: 300 },
     alerts: [],
@@ -382,9 +437,8 @@ const INITIAL_STADIUMS: StadiumData[] = [
       parkingOccupancy: 64,
       broadcastViewers: 8.5
     },
-    predictions: [
-      { id: 'tr-p1', message: 'Rain expected to slow entry scans by 3 minutes.', confidence: 78, impact: 'Slight delays at uncovered lines', action: 'Open overflow scanning gates', risk: 'Low', reasoning: ['Precipitation probability 65%', 'Outdoor queue configuration'] }
-    ]
+    predictions: [],
+    simulatedIncidents: []
   },
   {
     id: 'mexico-city',
@@ -395,6 +449,7 @@ const INITIAL_STADIUMS: StadiumData[] = [
     yPercent: 85,
     healthScore: 92,
     stadiumHealth: 'Excellent',
+    matchPhase: 'venue-closed',
     crowdDensity: [],
     visitors: { total: 84000, fans: 80000, staff: 3500, vip: 500 },
     alerts: [],
@@ -418,7 +473,8 @@ const INITIAL_STADIUMS: StadiumData[] = [
       parkingOccupancy: 81,
       broadcastViewers: 14.6
     },
-    predictions: []
+    predictions: [],
+    simulatedIncidents: []
   },
   {
     id: 'atlanta',
@@ -429,6 +485,7 @@ const INITIAL_STADIUMS: StadiumData[] = [
     yPercent: 52,
     healthScore: 95,
     stadiumHealth: 'Excellent',
+    matchPhase: 'pre-match',
     crowdDensity: [],
     visitors: { total: 71000, fans: 67800, staff: 2800, vip: 400 },
     alerts: [],
@@ -452,7 +509,8 @@ const INITIAL_STADIUMS: StadiumData[] = [
       parkingOccupancy: 74,
       broadcastViewers: 15.3
     },
-    predictions: []
+    predictions: [],
+    simulatedIncidents: []
   },
   {
     id: 'miami',
@@ -463,6 +521,7 @@ const INITIAL_STADIUMS: StadiumData[] = [
     yPercent: 72,
     healthScore: 96,
     stadiumHealth: 'Excellent',
+    matchPhase: 'full-time',
     crowdDensity: [],
     visitors: { total: 64800, fans: 61500, staff: 2800, vip: 500 },
     alerts: [],
@@ -486,7 +545,8 @@ const INITIAL_STADIUMS: StadiumData[] = [
       parkingOccupancy: 82,
       broadcastViewers: 16.9
     },
-    predictions: []
+    predictions: [],
+    simulatedIncidents: []
   }
 ];
 
@@ -494,13 +554,11 @@ const INITIAL_TIMELINE: TimelineItem[] = [
   { time: '14:29', event: 'Gate 3 congestion warning updated (Vancouver BC Place).', type: 'security' },
   { time: '14:26', event: 'VIP convoy entered West gate bay (New York MetLife).', type: 'operational' },
   { time: '14:20', event: 'Medical Team Alpha dispatched to Section 104.', type: 'medical' },
-  { time: '14:18', event: 'Metro express arrived at North Terminal.', type: 'transport' },
 ];
 
 const INITIAL_NOTIFICATIONS: NotificationItem[] = [
   { id: 'n1', message: 'Gate 3 congestion detected in Vancouver. Reroutes active.', type: 'security', read: false, timestamp: '14:32' },
   { id: 'n2', message: 'Medical response completed at Section 104.', type: 'medical', read: false, timestamp: '14:29' },
-  { id: 'n3', message: 'Los Angeles metro transit delayed on Century Blvd.', type: 'transport', read: false, timestamp: '14:25' },
 ];
 
 export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -576,6 +634,44 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
   else if (healthScore < 75) stadiumHealth = 'Warning';
   else if (healthScore < 90) stadiumHealth = 'Good';
 
+  // Live Fan Experience Index Calculation (Dynamic)
+  let restroomWait = 2; // mins default
+  let foodWait = 4;
+  let weatherComfort = 92;
+  
+  if (selectedStadium.weather.temp >= 32) weatherComfort -= 20;
+  if (selectedStadium.weather.rainProb >= 50) weatherComfort -= 15;
+
+  const dynamicWarnings = selectedStadium.simulatedIncidents.filter(i => i.status !== 'resolved').length;
+  const queueDeltas = crowdDensity.filter(c => c.status === 'critical').length * 4;
+
+  const queuesIdx = Math.max(20, 95 - queueDeltas * 8);
+  const accessibilityIdx = Math.max(40, 98 - (accessibility.filter(a => a.status === 'pending').length * 15));
+  const navIdx = 96;
+
+  const fanTotalScore = Math.round((queuesIdx + accessibilityIdx + navIdx + weatherComfort) / 4);
+  let fanExperienceScore: 'Excellent' | 'Good' | 'Fair' | 'Poor' = 'Excellent';
+  if (fanTotalScore < 50) fanExperienceScore = 'Poor';
+  else if (fanTotalScore < 70) fanExperienceScore = 'Fair';
+  else if (fanTotalScore < 88) fanExperienceScore = 'Good';
+
+  const fanExperienceBreakdown = {
+    queues: queuesIdx,
+    navigation: navIdx,
+    accessibility: accessibilityIdx,
+    food: Math.max(10, 92 - dynamicWarnings * 10),
+    restrooms: Math.max(10, 94 - queueDeltas * 5),
+    weather: weatherComfort
+  };
+
+  // Live Stadium Resilience Score (AI KPI)
+  let resilienceScore = 98;
+  resilienceScore -= activeAlertsCount * 12;
+  resilienceScore -= criticalZones * 10;
+  resilienceScore -= delayedTransport * 6;
+  resilienceScore -= selectedStadium.simulatedIncidents.filter(i => i.status !== 'resolved' && i.status !== 'archived').length * 8;
+  resilienceScore = Math.max(5, Math.min(100, resilienceScore));
+
   // central log timeline helper
   const triggerLog = (event: string, type: TimelineItem['type'] = 'system') => {
     const time = new Date().toTimeString().split(' ')[0].substring(0, 5);
@@ -588,6 +684,7 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const time = new Date().toTimeString().split(' ')[0].substring(0, 5);
     const updated = [{ id: `not-${Date.now()}`, message, type, read: false, timestamp: time }, ...notifications];
     saveState('stadium_notifications', updated, setNotifications);
+    playSynthTone('notification');
   };
 
   // helper to update a specific property of the currently active stadium in the array
@@ -623,7 +720,207 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
     saveState('stadium_multi_list', updatedList, setStadiums);
   };
 
-  // REUSABLE AI ACTION EXECUTION ENGINE (Targets currently active stadium)
+  // Match Phase changer
+  const changeMatchPhase = (phase: MatchPhase) => {
+    let updatedCrowd = [...crowdDensity];
+    let updatedTransit = [...transport];
+    let densityDelta = 0;
+    let occupancyLevel: 'low' | 'medium' | 'high' = 'medium';
+
+    if (phase === 'kickoff') {
+      densityDelta = 85;
+      occupancyLevel = 'high';
+      triggerLog(`Match kickoff whistle blown at ${selectedStadium.name}. Gates closing soon.`, 'operational');
+    } else if (phase === 'halftime') {
+      densityDelta = 75;
+      occupancyLevel = 'medium';
+      triggerLog(`Halftime whistle. High concession loop traffic detected at ${selectedStadium.name}.`, 'operational');
+    } else if (phase === 'full-time') {
+      densityDelta = 35;
+      occupancyLevel = 'high';
+      triggerLog(`Full-time! Dispatching additional shuttle express units to transit hub.`, 'transport');
+    }
+
+    if (updatedCrowd.length > 0) {
+      updatedCrowd = updatedCrowd.map(c => {
+        if (c.zone.includes('Gate')) {
+          return { ...c, density: Math.max(10, Math.min(100, densityDelta + Math.floor(Math.random() * 10 - 5))) };
+        }
+        return c;
+      });
+    }
+
+    if (updatedTransit.length > 0) {
+      updatedTransit = updatedTransit.map(t => ({ ...t, occupancy: occupancyLevel }));
+    }
+
+    updateActiveStadium({
+      matchPhase: phase,
+      crowdDensity: updatedCrowd,
+      transport: updatedTransit
+    });
+
+    triggerNotif(`Matchday phase shifted to: ${phase.toUpperCase()} at ${selectedStadium.city}`, 'operational');
+  };
+
+  // predefined emergencies playbooks
+  const executePlaybook = async (playbookId: string) => {
+    triggerLog(`Emergency Playbook initiated: ${playbookId.toUpperCase()} at ${selectedStadium.name}.`, 'security');
+    playSynthTone('emergency');
+
+    if (playbookId === 'gate-congestion') {
+      await executeAction('OPEN_GATE_4', 'Playbook: Resolve Gate Congestion');
+      await executeAction('REDIRECT_CROWD', 'Playbook: Redirection loop');
+    } else if (playbookId === 'medical-surge') {
+      await executeAction('DEPLOY_MEDICAL', 'Playbook: Deploy Medical Squad 2');
+      addTask({ title: 'Mobilise standby medical stretcher unit', assignee: 'Medical Team 2', priority: 'high', location: 'Section 108' });
+    } else if (playbookId === 'heavy-rain') {
+      await executeAction('OPEN_GATE_4', 'Playbook: Open Covered Entrances');
+      await executeAction('INCREASE_SHUTTLE', 'Playbook: Double Shuttle Line B');
+      addTask({ title: 'Deploy dry corridor umbrellas', assignee: 'Gate 4 Volunteers', priority: 'medium', location: 'Gate 4' });
+    } else if (playbookId === 'power-failure') {
+      await executeAction('REDUCE_ENERGY', 'Playbook: Emergency dimming');
+      triggerLog('Backup solar grids switched to full battery operation.', 'system');
+    }
+  };
+
+  // manual incident trigger
+  const triggerRandomIncident = () => {
+    const INCIDENT_TEMPLATES = [
+      { title: 'Lost Child Alert', type: 'operational' as const, severity: 'medium' as const, location: 'Gate 2 Concourse', recommended: 'Dispatch volunteer helpers and display photo alerts.', impact: 'Parent anxiety, local search loop', resolution: '10 mins' },
+      { title: 'Suspicious Bag found', type: 'security' as const, severity: 'high' as const, location: 'Section 114 Corridor', recommended: 'Establish 10m perimeter, dispatch Security Bravo.', impact: 'Local corridor bottleneck', resolution: '15 mins' },
+      { title: 'Gate Scanner Lag', type: 'operational' as const, severity: 'low' as const, location: 'Gate 3 Entry Turnstile', recommended: 'Reset local scanning terminal, dispatch technician.', impact: 'Turnstile wait times +4m', resolution: '8 mins' }
+    ];
+
+    const target = INCIDENT_TEMPLATES[Math.floor(Math.random() * INCIDENT_TEMPLATES.length)];
+    const newInc: SimulatedIncident = {
+      id: `sim-inc-${Date.now()}`,
+      title: target.title,
+      type: target.type,
+      severity: target.severity,
+      location: target.location,
+      timestamp: new Date().toISOString(),
+      recommendedResponse: target.recommended,
+      estimatedImpact: target.impact,
+      aiConfidence: 94,
+      expectedResolutionTime: target.resolution,
+      status: 'detected',
+      progress: 0,
+      afterActionReport: null
+    };
+
+    updateActiveStadium({
+      simulatedIncidents: [newInc, ...selectedStadium.simulatedIncidents]
+    });
+
+    triggerLog(`New Incident Detected: ${target.title} at ${target.location}.`, target.type);
+    triggerNotif(`🚨 AI Warning: ${target.title} detected. Action recommended.`, target.type);
+    playSynthTone('emergency');
+  };
+
+  // AI DIGITAL TWIN LOOP: interpolates stadium telemetry values every 15 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Loop over all stadiums and slightly adjust values (crowd, weather, sustainability)
+      const interpolated = stadiums.map(stadium => {
+        // 1. Crowd Density fluctuation
+        const updatedCrowd = stadium.crowdDensity.map(c => {
+          const change = Math.floor(Math.random() * 3) - 1; // -1, 0, +1
+          const nextDensity = Math.min(100, Math.max(5, c.density + change));
+          return {
+            ...c,
+            density: nextDensity,
+            currentCount: Math.round(c.capacity * (nextDensity / 100))
+          };
+        });
+
+        // 2. Weather temp fluctuation
+        const tempChange = Math.floor(Math.random() * 3) - 1; // -1, 0, +1 temp change
+        const nextTemp = Math.min(42, Math.max(12, stadium.weather.temp + tempChange * 0.2));
+
+        // 3. Sustainability Energy Output
+        const energyChange = Math.floor(Math.random() * 100) - 50;
+        const nextEnergy = Math.min(9000, Math.max(1000, stadium.sustainability.energyUsageKw + energyChange));
+
+        // 4. Incident Lifecycle Evolution (Detected -> Assigned -> Responding -> Contained -> Resolved -> Archived)
+        const updatedIncidents = stadium.simulatedIncidents.map(inc => {
+          if (inc.status === 'archived') return inc;
+          
+          let nextProgress = inc.progress + Math.floor(Math.random() * 15) + 5;
+          let nextStatus: SimulatedIncident['status'] = inc.status;
+
+          if (nextProgress >= 100) {
+            nextProgress = 100;
+            if (inc.status !== 'resolved') {
+              nextStatus = 'resolved';
+              
+              // Generate After Action Report UI PDF mock
+              const reportId = `rep-${inc.id}`;
+              const actionReport: AfterActionReport = {
+                id: reportId,
+                title: inc.title,
+                summary: `AI Digital Twin automatically resolved incident: ${inc.title} at ${inc.location}. Operational stability restored.`,
+                timeline: [
+                  { time: 'T+0m', event: `Incident detected by AI Telemetry sensors.` },
+                  { time: 'T+2m', event: `Security Dispatch payload deployed.` },
+                  { time: 'T+8m', event: `Operations crews contained corridor bottlenecks.` },
+                  { time: 'T+12m', event: `Resolution verified. Systems returned to nominal.` }
+                ],
+                departments: ['Venue Operations', 'AI Control Team', 'Staff Volunteers'],
+                aiActions: [inc.recommendedResponse],
+                humanActions: ['Field verification check', 'CCTV monitoring log completed'],
+                resolutionTime: inc.expectedResolutionTime,
+                lessonsLearned: 'Sensor configuration requires regular baseline calibration to reduce false alarms.',
+                futureRecommendation: 'Establish redundant backup terminals at Gate entrance lines.'
+              };
+              inc.afterActionReport = actionReport;
+
+              // Dispatch notification
+              setTimeout(() => {
+                triggerLog(`Incident Resolved: ${inc.title} resolved at ${stadium.name}.`, inc.type);
+                triggerNotif(`✓ Incident Resolved: ${inc.title} at ${stadium.city}.`, inc.type);
+                playSynthTone('success');
+              }, 100);
+            } else {
+              nextStatus = 'archived';
+            }
+          } else if (nextProgress > 80) {
+            nextStatus = 'contained';
+          } else if (nextProgress > 50) {
+            nextStatus = 'responding';
+          } else if (nextProgress > 20) {
+            nextStatus = 'assigned';
+          }
+
+          return {
+            ...inc,
+            status: nextStatus,
+            progress: nextProgress
+          };
+        });
+
+        return {
+          ...stadium,
+          crowdDensity: updatedCrowd,
+          weather: {
+            ...stadium.weather,
+            temp: parseFloat(nextTemp.toFixed(1))
+          },
+          sustainability: {
+            ...stadium.sustainability,
+            energyUsageKw: nextEnergy
+          },
+          simulatedIncidents: updatedIncidents
+        };
+      });
+
+      setStadiums(interpolated);
+    }, 18000); // Trigger every 18 seconds!
+
+    return () => clearInterval(interval);
+  }, [stadiums]);
+
+  // REUSABLE AI ACTION EXECUTION ENGINE
   const executeAction = async (actionType: string, prompt: string): Promise<boolean> => {
     const prevState = {
       crowdDensity,
@@ -834,22 +1131,6 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
       };
     }
 
-    if (!outcomeText) {
-      triggerLog(`AI Action executed: ${actionType} at ${selectedStadium.name}`, 'system');
-      triggerNotif(`Operations applied payload at ${selectedStadium.name}`, 'operational');
-      outcomeText = 'Operations parameters successfully adjusted.';
-      report = {
-        title: 'AI Action Completed',
-        beforeVal: 'Operational Mode',
-        afterVal: 'Optimized Mode',
-        metricLabel: 'Stadium Status',
-        divertedCount: 0,
-        extraStaff: 2,
-        waitBefore: 'N/A',
-        waitAfter: 'Optimized'
-      };
-    }
-
     const historyItem: OperationHistoryItem = {
       id: `hist-${Date.now()}`,
       prompt,
@@ -863,6 +1144,10 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     saveState('stadium_ops_history', [historyItem, ...history], setHistory);
     setActiveReport(report);
+    
+    // Play sound cues
+    playSynthTone('success');
+    setTimeout(() => playSynthTone('ai-complete'), 350);
 
     return true;
   };
@@ -927,6 +1212,7 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
       tasks: [newTask, ...tasks]
     });
     triggerLog(`Task assigned: "${task.title}" allocated to ${task.assignee} at ${selectedStadium.name}.`, 'operational');
+    playSynthTone('dispatch');
   };
 
   const toggleTask = (id: string) => {
@@ -952,6 +1238,7 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
       alerts: [newAlert, ...alerts]
     });
     triggerLog(`Emergency dispatched: ${alert.title} at ${alert.location} in ${selectedStadium.name}.`, 'security');
+    playSynthTone('emergency');
   };
 
   const resolveEmergency = (id: string) => {
@@ -1035,7 +1322,13 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
       refreshFeeds,
       refreshTransit,
       clearNotifications,
-      markNotificationRead
+      markNotificationRead,
+      changeMatchPhase,
+      executePlaybook,
+      triggerRandomIncident,
+      resilienceScore,
+      fanExperienceScore,
+      fanExperienceBreakdown
     }}>
       {children}
     </StadiumContext.Provider>
