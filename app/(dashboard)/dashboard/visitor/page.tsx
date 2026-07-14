@@ -11,7 +11,7 @@ import { DatabaseService } from '@/lib/db';
 import { TransportStatus, AccessibilityRequest } from '@/types';
 import { 
   MapPin, Ticket, Bus, Bot, Accessibility, Leaf, Bell, User, QrCode, 
-  Map, ArrowUpRight, Compass, FlameKindling, Navigation, Smile, Coffee, HelpCircle
+  Map, ArrowUpRight, Compass, FlameKindling, Navigation, Smile, Coffee, HelpCircle, Trophy, Info
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -93,6 +93,101 @@ export default function VisitorDashboard() {
         </div>
       </div>
 
+      {/* Global Match Center & Live Weather Row */}
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* Match Center Card (Fan View) */}
+        <Card className="md:col-span-2 bg-[#080d19]/45 border-slate-900/60 overflow-hidden relative flex flex-col justify-between">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-amber-500/5 to-transparent blur-3xl rounded-full" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-white">
+                <Trophy className="h-4.5 w-4.5 text-amber-400" />
+                Global Match Center
+              </span>
+              <Badge variant="warning" className="text-[9px] uppercase tracking-wider font-mono">Quarter Final</Badge>
+            </CardTitle>
+            <CardDescription className="text-xs">Stadium Alpha Matchday Telemetry</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-2 space-y-4 flex-1 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-center bg-slate-950/40 border border-slate-900 rounded-xl p-4">
+              <div className="flex-1">
+                <span className="text-2xl font-black block text-white">ARG</span>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Argentina</span>
+              </div>
+              <div className="px-4">
+                <span className="text-xs font-mono font-bold text-cyan-400 block mb-1">KICKOFF COUNTDOWN</span>
+                <Badge variant="secondary" className="font-mono text-sm py-1 px-3 bg-blue-950/80 text-blue-300 border border-blue-800/40">1h 24m</Badge>
+              </div>
+              <div className="flex-1">
+                <span className="text-2xl font-black block text-white">GER</span>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Germany</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3.5 text-xs">
+              <div className="p-3 rounded-lg border border-slate-800 bg-[#070b13]/30">
+                <span className="text-slate-400 block text-[10px] uppercase font-mono tracking-wider mb-0.5">Match Officials</span>
+                <span className="text-slate-200 font-bold">Referee: Piero Maza (Chile)</span>
+              </div>
+              <div className="p-3 rounded-lg border border-slate-800 bg-[#070b13]/30">
+                <span className="text-slate-400 block text-[10px] uppercase font-mono tracking-wider mb-0.5">Stadium Seating</span>
+                <span className="text-slate-200 font-bold">68,420 / 70,000 Attendance (97%)</span>
+              </div>
+            </div>
+
+            {/* Fan Comfort Advisory */}
+            <div className="flex items-start gap-2.5 p-3 rounded-lg border border-amber-900/30 bg-amber-950/10 text-xs">
+              <Info className="h-4.5 w-4.5 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold text-amber-400 block mb-0.5">Spectator Hydration Advisory</span>
+                <p className="text-slate-300 leading-relaxed text-[11px]">
+                  Temperatures are currently peak at 31°C (Partly Cloudy). Free chilled water refill stations are active across all Gate 4 concourse loops.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Live Weather & Environment Widget */}
+        <Card className="bg-[#080d19]/45 border-slate-900/60 overflow-hidden relative flex flex-col justify-between">
+          <CardHeader className="pb-3 border-b border-slate-900/60">
+            <CardTitle className="text-sm font-semibold flex items-center justify-between">
+              <span className="text-white">Live Weather Center</span>
+              <Badge variant="destructive" className="text-[9px] uppercase tracking-wider font-mono animate-pulse">Heat Advisory</Badge>
+            </CardTitle>
+            <CardDescription className="text-xs">Environmental Sensor Matrix</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-4 flex-1 flex flex-col justify-between">
+            <div className="flex justify-between items-center bg-slate-950/35 border border-slate-900 p-3.5 rounded-xl">
+              <div>
+                <span className="text-3xl font-black text-white">31°C</span>
+                <span className="block text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">Partly Cloudy</span>
+              </div>
+              <span className="text-3xl">⛅</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-400 leading-normal">
+              <div className="p-2 border border-slate-800 bg-[#070b13]/20 rounded">
+                Humidity: <span className="text-white font-bold">65%</span>
+              </div>
+              <div className="p-2 border border-slate-800 bg-[#070b13]/20 rounded">
+                Wind Speed: <span className="text-white font-bold">14 km/h</span>
+              </div>
+              <div className="p-2 border border-slate-800 bg-[#070b13]/20 rounded">
+                Rain Probability: <span className="text-white font-bold">12%</span>
+              </div>
+              <div className="p-2 border border-slate-800 bg-[#070b13]/20 rounded">
+                UV Index: <span className="text-amber-500 font-bold">8 (Very High)</span>
+              </div>
+            </div>
+
+            <div className="text-[10px] text-slate-400 p-2 border border-dashed border-slate-800 rounded text-center bg-slate-950/20">
+              💡 <span className="font-semibold text-slate-200">Recommendation:</span> Sunscreens active. High heat index.
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Main Grid */}
       <div className="grid gap-6 md:grid-cols-3">
         {/* Ticket Information & QR */}
@@ -118,7 +213,7 @@ export default function VisitorDashboard() {
               <div className="border-t border-dashed border-slate-800 my-3.5 pt-3.5 text-left text-xs font-mono space-y-1 text-slate-300">
                 <div className="flex justify-between">
                   <span>Match:</span>
-                  <span className="text-white font-bold">USA vs England</span>
+                  <span className="text-white font-bold">Argentina vs Germany</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Venue:</span>

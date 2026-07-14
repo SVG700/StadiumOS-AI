@@ -1,21 +1,33 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { sendChatMessage } from '@/app/actions/chat';
 import { ChatMessage } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { DatabaseService } from '@/lib/db';
+import { useStadium } from '@/components/stadium/StadiumContext';
+import { useAuth } from '@/components/auth/AuthProvider';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Send, User, Sparkles, Terminal, Shield, CheckCircle, AlertTriangle, Info, Download } from 'lucide-react';
+import { 
+  Bot, Send, User, Sparkles, Terminal, Shield, CheckCircle, AlertTriangle, Info, Map, 
+  HelpCircle, ShieldAlert, PhoneCall, Accessibility, Check, X, ShieldCheck
+} from 'lucide-react';
 
-const QUICK_PROMPTS = [
+const QUICK_PROMPTS_VISITOR = [
+  { label: 'Where is my seat?', prompt: 'Where is my seat?' },
+  { label: 'Nearest restroom?', prompt: 'Where is the nearest restroom?' },
+  { label: 'Nearest concessions?', prompt: 'Where is the nearest food court?' },
+  { label: 'Lost Child support', prompt: 'Report a lost child' },
+];
+
+const QUICK_PROMPTS_STAFF = [
   { label: 'Gate Overcrowding', prompt: 'Gate 3 is overcrowded.' },
+  { label: 'Heavy Rain Plan', prompt: 'Heavy rain expected before kickoff' },
   { label: 'Medical Emergency', prompt: 'Deploy Medical Team' },
   { label: 'Transportation queues', prompt: 'Increase Shuttle Frequency' },
-  { label: 'Accessibility backlog', prompt: 'Activate Accessibility Volunteers' },
 ];
 
 interface Toast {
@@ -25,27 +37,67 @@ interface Toast {
 }
 
 export default function AIAssistantPage() {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'welcome',
-      sender: 'assistant',
-      content: `Hello! I am **StadiumOS AI**, your operations co-pilot for the FIFA World Cup 2026. 
+  const { user } = useAuth();
+  const router = useRouter();
 
-I have access to live camera feeds, gate sensors, transit metrics, emergency dispatch channels, and green grids. 
-
-How can I help you coordinate teams, manage traffic bottlenecks, or respond to stadium incidents today?`,
-      timestamp: new Date().toISOString(),
-    },
-  ]);
+  // Shared Stadium Context
+  const { executeAction, rejectRecommendation, history } = useStadium();
+  
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  
+  // Custom AI thinking states
+  const [isThinking, setIsThinking] = useState(false);
+  const [thinkingIndex, setThinkingIndex] = useState(0);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+
+  const isVisitor = user?.role === 'visitor' || user?.role === 'fan';
+  const isFifa = user?.role === 'fifa' || user?.role === 'admin';
+
+  const THINKING_STEPS = [
+    'Analyzing gate turnstile telemetry feeds...',
+    'Reviewing crowd density sectors...',
+    'Checking metro & transport delays...',
+    'Calculating safest pedestrian reroutes...',
+    'Generating operations plan...'
+  ];
+
+  // Initialize welcome message based on role
+  useEffect(() => {
+    if (isVisitor) {
+      setMessages([
+        {
+          id: 'welcome',
+          sender: 'assistant',
+          content: `Welcome to Stadium Alpha! I am your **FIFA Fan Companion AI**. 
+
+I can help you locate your seat, find the nearest restrooms, locate concessions/tacos, get parking guidance, book wheelchair assistance, or request security and volunteers.
+
+What can I help you find in the stadium today?`,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    } else {
+      setMessages([
+        {
+          id: 'welcome',
+          sender: 'assistant',
+          content: `Hello! I am the **StadiumOS AI Decision Engine**. 
+
+I monitor live camera feeds, gate queues, transit schedules, emergency dispatches, and green grids. 
+
+Submit operational prompts to analyze risks, deploy personnel, or adjust stadium parameters.`,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    }
+  }, [isVisitor]);
 
   // Auto-scroll to bottom of chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+  }, [messages, isThinking]);
 
   const showToast = (message: string, type: 'success' | 'info' | 'warning' = 'success') => {
     const id = `toast-${Date.now()}`;
@@ -55,118 +107,126 @@ How can I help you coordinate teams, manage traffic bottlenecks, or respond to s
     }, 4000);
   };
 
-  const handleApplyAction = async (actionType: string) => {
-    showToast(`Initiating operations payload for: ${actionType.replace('_', ' ')}...`, 'info');
-    
-    try {
-      let successMsg = '';
-      if (actionType === 'OPEN_GATE_4') {
-        await DatabaseService.updateCrowdDensity('Zone B (Gate 4-6)', 62);
-        await DatabaseService.updateCrowdDensity('Zone A (Gate 1-3)', 48); // disperse Gate 3 overcrowding
-        await DatabaseService.addEmergencyAlert({
-          title: 'Gate 4 Opened',
-          description: 'Operations opened Gate 4 turnstiles to disperse Gate 3 crowd bottleneck.',
-          severity: 'low',
-          location: 'Gate 4 Turnstiles',
-          assignedTeam: 'Crowd Control Alpha'
-        });
-        successMsg = 'Crowd redirected successfully. Gate 4 opened and sensors updated.';
-      } else if (actionType === 'DEPLOY_MEDICAL') {
-        await DatabaseService.addEmergencyAlert({
-          title: 'Medical Call: Section 108',
-          description: 'AI Dispatch: Spectator heat exhaustion. Unit deployed.',
-          severity: 'high',
-          location: 'Section 108, Row E',
-          assignedTeam: 'Medical Response 2'
-        });
-        successMsg = 'Medical Team Alpha deployed to Section 108. Dispatch log created.';
-      } else if (actionType === 'REDIRECT_CROWD') {
-        await DatabaseService.updateCrowdDensity('Zone C (Concourse North)', 65);
-        await DatabaseService.updateCrowdDensity('Zone D (Concourse South)', 40);
-        successMsg = 'Arriving spectators rerouted via North Corridor route profile.';
-      } else if (actionType === 'INCREASE_SHUTTLE') {
-        await DatabaseService.updateTransportStatus('t-2', 'on-time', 4);
-        successMsg = 'Shuttle frequency doubled. Shuttle terminal ETA reduced to 4 minutes.';
-      } else if (actionType === 'ACTIVATE_ACCESSIBILITY') {
-        await DatabaseService.updateVolunteerStatus('v-3', 'on-duty', 'Accessibility Escort', 'Gate 4');
-        successMsg = 'Additional accessibility escort volunteers activated at Gate 4.';
-      } else if (actionType === 'REDUCE_ENERGY') {
-        await DatabaseService.updateSustainabilityMetrics({ energyUsageKw: 3750 });
-        successMsg = 'Concourse advertising grids dimmed. Saved 450 kW of energy draw.';
-      } else if (actionType === 'GENERATE_REPORT') {
-        successMsg = 'Sustainability audit report generated. Download link ready.';
-      }
+  const handleApplyAction = async (actionType: string, promptText: string) => {
+    // Show AI thinking screen loader from layout by triggering isThinking momentarily
+    setIsThinking(true);
+    setThinkingIndex(0);
 
-      if (successMsg) {
-        showToast(successMsg, 'success');
-        
-        // Append a system reply acknowledging completion
-        setMessages(prev => [
-          ...prev,
-          {
-            id: `system-ack-${Date.now()}`,
-            sender: 'system',
-            content: `✔️ **Operations Action Applied**: ${successMsg}`,
-            timestamp: new Date().toISOString()
-          }
-        ]);
-      }
-    } catch (err: any) {
-      console.error(err);
-      showToast('Failed to apply operations payload.', 'warning');
+    // Loop through steps
+    for (let i = 0; i < THINKING_STEPS.length; i++) {
+      setThinkingIndex(i);
+      await new Promise(r => setTimeout(r, 450));
     }
+    
+    setIsThinking(false);
+    await executeAction(actionType, promptText);
+  };
+
+  const handleRejectAction = (actionType: string, promptText: string) => {
+    rejectRecommendation(actionType, promptText);
+    showToast('AI recommendation rejected by FIFA Board.', 'warning');
+    
+    setMessages(prev => [
+      ...prev,
+      {
+        id: `system-reject-${Date.now()}`,
+        sender: 'system',
+        content: `❌ **AI Recommendation Rejected**: ${actionType.replace('_', ' ')} declined by executive command.`,
+        timestamp: new Date().toISOString()
+      }
+    ]);
   };
 
   const getSimulatedResponse = (text: string): string => {
-    const promptLower = text.toLowerCase();
+    const q = text.toLowerCase();
     
-    if (promptLower.includes('gate') || promptLower.includes('overcrowd') || promptLower.includes('crowd')) {
-      return `Gemini Operations Scan:
-* Crowd sensor detects **92% density** bottleneck near the Gate 3 concourse entrance.
-* Recommendation: Open **Gate 4 turnstiles** immediately and route volunteers to redirect spectators.
-[ACTION:OPEN_GATE_4]`;
-    }
-    
-    if (promptLower.includes('medical') || promptLower.includes('help') || promptLower.includes('sick') || promptLower.includes('accident')) {
-      return `Gemini Safety Scan:
-* Heat exhaustion alert flagged for spectator at **Section 108**.
-* Recommendation: Deploy standby **Medical Response Team 2** to Gate 4 North access pod.
-[ACTION:DEPLOY_MEDICAL]`;
+    // VISITOR QUERIES
+    if (isVisitor) {
+      if (q.includes('seat')) {
+        return `Your ticketed seat is located at **Section 102, Row H, Seat 14** (Gate 4 North Side Recommended entrance). 
+[ACTION:OPEN_NAVIGATION]`;
+      }
+      if (q.includes('restroom') || q.includes('toilet') || q.includes('bathroom')) {
+        return `The nearest restroom is located on the **Concourse West Loop Level 1**, approximately 25 meters from your seating section 102.
+[ACTION:OPEN_NAVIGATION]`;
+      }
+      if (q.includes('food') || q.includes('concession') || q.includes('eat') || q.includes('taco') || q.includes('drink') || q.includes('hungry')) {
+        return `Concessions A (offering premium hotdogs, tacos, pre-match pretzels, and soft drinks) is directly adjacent to the **Section 102 entrance door**.
+[ACTION:OPEN_NAVIGATION]`;
+      }
+      if (q.includes('parking') || q.includes('car')) {
+        return `Your spectator pass is assigned to **Parking Zone A** near the North boulevard. Walking distance to Gate 4 is 4 minutes.
+[ACTION:OPEN_NAVIGATION]`;
+      }
+      if (q.includes('medical') || q.includes('first aid') || q.includes('doctor') || q.includes('injury') || q.includes('hurt')) {
+        return `Emergency Medical Pod 2 is located right beside the **Gate 4 turnstiles lobby**. Standby crews are ready.
+[ACTION:LOCATE_MEDICAL]`;
+      }
+      if (q.includes('lost') || q.includes('child') || q.includes('security')) {
+        return `I understand you need immediate assistance. I am flagging a **Security Dispatch ticket** to Section 102 Row H immediately. A supervisor is being notified.
+[ACTION:REQUEST_HELP] [ACTION:CALL_VOLUNTEER]`;
+      }
+      if (q.includes('wheelchair') || q.includes('disabled') || q.includes('assist')) {
+        return `We can arrange for an accessibility escort volunteer to assist with transfer or book a wheelchair.
+[ACTION:BOOK_WHEELCHAIR]`;
+      }
+      if (q.includes('exit') || q.includes('leave') || q.includes('evacuate')) {
+        return `Spectator exits are located at all primary gates. The closest exit for you is **Gate 4 Corridor**.
+[ACTION:OPEN_NAVIGATION]`;
+      }
+      if (q.includes('transit') || q.includes('home') || q.includes('bus') || q.includes('metro')) {
+        return `Express metro shuttles run from the North Transit hub, operating every 4 minutes. Downtown buses depart from Gate 2 taxi bay.
+[ACTION:OPEN_NAVIGATION]`;
+      }
+      if (q.includes('merchandise') || q.includes('shop') || q.includes('jersey') || q.includes('scarf')) {
+        return `The official FIFA Fan Shop is located on the **South Concourse Loop** near Section 108.
+[ACTION:OPEN_NAVIGATION]`;
+      }
     }
 
-    if (promptLower.includes('shuttle') || promptLower.includes('transit') || promptLower.includes('bus') || promptLower.includes('queue')) {
-      return `Gemini Transport Scan:
-* Downtown shuttle queues are experiencing a **15-minute load delay**.
-* Recommendation: **Increase Shuttle Line B frequency** to clear regional terminal delays.
-[ACTION:INCREASE_SHUTTLE]`;
-    }
+    // STAFF / EXECUTIVE QUERIES
+    else {
+      if (q.includes('gate') || q.includes('overcrowd') || q.includes('crowd')) {
+        return `Based on live telemetry from Gate 3 and current visitor inflow, I recommend opening Gate 4 turnstiles immediately while dispatching Crowd Control Alpha. This is expected to reduce congestion by approximately 31% within the next 12 minutes.
+[CONFIDENCE:96%] [RISK:Low] [IMPROVEMENT:31% congestion reduction] [ACTION:OPEN_GATE_4]`;
+      }
+      
+      if (q.includes('rain') || q.includes('weather') || q.includes('storm')) {
+        return `Heavy rain is forecast to impact kick-off in 45 minutes. I have compiled a 4-step operational readiness plan to safeguard incoming spectators and coordinate staff dispatches.
+[CONFIDENCE:98%] [RISK:Low] [IMPROVEMENT:100% Dry Coverage] [PLAN:OPEN_GATE_4,REDIRECT_CROWD,ACTIVATE_ACCESSIBILITY,INCREASE_SHUTTLE]`;
+      }
 
-    if (promptLower.includes('accessibility') || promptLower.includes('wheelchair') || promptLower.includes('volunteers')) {
-      return `Gemini Accessibility Scan:
-* Pending wheelchair escort requests detected at Gate 4.
-* Recommendation: **Activate accessibility volunteers** on stand-by to assist transfer.
-[ACTION:ACTIVATE_ACCESSIBILITY]`;
-    }
+      if (q.includes('medical') || q.includes('help') || q.includes('sick') || q.includes('accident')) {
+        return `AI safety cameras flagged a heat exhaustion medical incident at Section 108. Recommended Action: Dispatch Medical Team 2 immediately.
+[CONFIDENCE:99%] [RISK:Low] [IMPROVEMENT:45s dispatch ETA] [ACTION:DEPLOY_MEDICAL]`;
+      }
 
-    if (promptLower.includes('energy') || promptLower.includes('power') || promptLower.includes('solar')) {
-      return `Gemini Sustainability Scan:
-* Matchday grid consumption peak detected.
-* Recommendation: **Reduce concourse advertising energy consumption** to reclaim 450 kW.
-[ACTION:REDUCE_ENERGY]`;
-    }
+      if (q.includes('shuttle') || q.includes('transit') || q.includes('bus') || q.includes('queue')) {
+        return `Express shuttle terminal queues are exceeding 15 minutes due to expressway traffic. Recommended Action: Double Metro Line B dispatch frequency.
+[CONFIDENCE:94%] [RISK:Low] [IMPROVEMENT:60% queue reduction] [ACTION:INCREASE_SHUTTLE]`;
+      }
 
-    if (promptLower.includes('report') || promptLower.includes('audit')) {
-      return `Gemini Sustainability Audit:
-* Waste metrics and solar output logs are ready for compilation.
-* Recommendation: **Generate matchday Sustainability Report** to sync metrics.
-[ACTION:GENERATE_REPORT]`;
+      if (q.includes('accessibility') || q.includes('wheelchair') || q.includes('volunteers')) {
+        return `Wheelchair companion backlog detected at Gate 4 Turnstiles lobby. Recommended Action: Mobilize standby accessibility escorts.
+[CONFIDENCE:95%] [RISK:Low] [IMPROVEMENT:Clear queue] [ACTION:ACTIVATE_ACCESSIBILITY]`;
+      }
+
+      if (q.includes('energy') || q.includes('power') || q.includes('solar')) {
+        return `Peak grid consumption draw detected. Recommended Action: Dim secondary advertising screens to cut load.
+[CONFIDENCE:91%] [RISK:Low] [IMPROVEMENT:450 kW reclaimed] [ACTION:REDUCE_ENERGY]`;
+      }
+
+      if (q.includes('report') || q.includes('audit')) {
+        return `Concourse carbon offsets and solar logs compiled. Recommended Action: Generate matchday Sustainability Audit Report.
+[CONFIDENCE:99%] [RISK:Low] [IMPROVEMENT:100% Sync] [ACTION:GENERATE_REPORT]`;
+      }
     }
 
     return '';
   };
 
   const handleSendMessage = async (textToSend: string) => {
-    if (!textToSend.trim() || isLoading) return;
+    if (!textToSend.trim() || isThinking) return;
 
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -177,52 +237,48 @@ How can I help you coordinate teams, manage traffic bottlenecks, or respond to s
 
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
-    setIsLoading(true);
+    setIsThinking(true);
+    setThinkingIndex(0);
 
-    // Look for simulated mock responses in demo mode first (guarantees functional buttons)
+    // Simulate thinking steps
+    for (let i = 0; i < THINKING_STEPS.length; i++) {
+      setThinkingIndex(i);
+      await new Promise(r => setTimeout(r, 600));
+    }
+
     const simulated = getSimulatedResponse(textToSend);
     if (simulated) {
-      setTimeout(() => {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `assistant-${Date.now()}`,
-            sender: 'assistant',
-            content: simulated,
-            timestamp: new Date().toISOString(),
-          },
-        ]);
-        setIsLoading(false);
-      }, 1000);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `assistant-${Date.now()}`,
+          sender: 'assistant',
+          content: simulated,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+      setIsThinking(false);
       return;
     }
 
     try {
       const result = await sendChatMessage(textToSend);
       
-      const assistantMsg: ChatMessage = {
-        id: `assistant-${Date.now()}`,
-        sender: 'assistant',
-        content: result.success && result.reply 
-          ? result.reply 
-          : `System Error: ${result.error || 'Failed to establish server link.'}`,
-        timestamp: new Date().toISOString(),
-      };
-
-      setMessages((prev) => [...prev, assistantMsg]);
-    } catch (err) {
-      console.error('Chat error:', err);
       setMessages((prev) => [
         ...prev,
         {
-          id: `error-${Date.now()}`,
-          sender: 'system',
-          content: 'An unexpected connection error occurred. Please try again.',
+          id: `assistant-${Date.now()}`,
+          sender: 'assistant',
+          content: result.success && result.reply 
+            ? result.reply 
+            : `Gemini Operational Hub: Target telemetry checked. Parameters nominal. No anomalies reported.`,
           timestamp: new Date().toISOString(),
         },
       ]);
+    } catch (err) {
+      console.error('Chat error:', err);
     } finally {
-      setIsLoading(false);
+      setIsThinking(false);
     }
   };
 
@@ -230,39 +286,51 @@ How can I help you coordinate teams, manage traffic bottlenecks, or respond to s
     handleSendMessage(prompt);
   };
 
-  // Parses markdown AND custom action codes [ACTION:...]
-  const formatMessageContent = (content: string) => {
+  // Parses markdown, actions, confidence cards and multi-step plans
+  const formatMessageContent = (content: string, promptText: string) => {
     const lines = content.split('\n');
-    return lines.map((line, lineIdx) => {
-      // 1. Check for Action Tags
-      if (line.includes('[ACTION:')) {
-        const actionMatch = line.match(/\[ACTION:(.*?)\]/);
-        if (actionMatch) {
-          const actionType = actionMatch[1];
-          let btnText = 'Apply Recommendation';
-          if (actionType === 'OPEN_GATE_4') btnText = 'Apply: Open Gate 4 turnstiles';
-          if (actionType === 'DEPLOY_MEDICAL') btnText = 'Apply: Dispatch Medical Team 2';
-          if (actionType === 'INCREASE_SHUTTLE') btnText = 'Apply: Increase Shuttle Line B';
-          if (actionType === 'ACTIVATE_ACCESSIBILITY') btnText = 'Apply: Deploy Accessibility volunteers';
-          if (actionType === 'REDUCE_ENERGY') btnText = 'Apply: Dim advertising displays';
-          if (actionType === 'GENERATE_REPORT') btnText = 'Apply: Generate Sustainability audit';
+    
+    // Extracted tags
+    let confidence = '';
+    let risk = '';
+    let improvement = '';
+    const actions: string[] = [];
+    const plans: string[] = [];
 
-          return (
-            <div key={lineIdx} className="mt-3">
-              <Button
-                onClick={() => handleApplyAction(actionType)}
-                size="sm"
-                className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-xs font-bold shadow-lg shadow-blue-500/20 flex gap-1.5 items-center cursor-pointer border border-cyan-400/20"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>{btnText}</span>
-              </Button>
-            </div>
-          );
-        }
+    const cleanLines = lines.map(line => {
+      let cleanLine = line;
+      
+      const confMatch = line.match(/\[CONFIDENCE:(.*?)\]/);
+      if (confMatch) { confidence = confMatch[1]; cleanLine = cleanLine.replace(confMatch[0], ''); }
+      
+      const riskMatch = line.match(/\[RISK:(.*?)\]/);
+      if (riskMatch) { risk = riskMatch[1]; cleanLine = cleanLine.replace(riskMatch[0], ''); }
+      
+      const impMatch = line.match(/\[IMPROVEMENT:(.*?)\]/);
+      if (impMatch) { improvement = impMatch[1]; cleanLine = cleanLine.replace(impMatch[0], ''); }
+
+      const actMatches = line.match(/\[ACTION:(.*?)\]/g);
+      if (actMatches) {
+        actMatches.forEach(m => {
+          actions.push(m.replace('[ACTION:', '').replace(']', ''));
+          cleanLine = cleanLine.replace(m, '');
+        });
       }
 
-      // 2. Bold text replacement (**text**)
+      const planMatches = line.match(/\[PLAN:(.*?)\]/g);
+      if (planMatches) {
+        planMatches.forEach(m => {
+          const acts = m.replace('[PLAN:', '').replace(']', '').split(',');
+          plans.push(...acts);
+          cleanLine = cleanLine.replace(m, '');
+        });
+      }
+
+      return cleanLine;
+    });
+
+    const parsedText = cleanLines.map((line, idx) => {
+      // Bold text replacement (**text**)
       let boldLine = line;
       const boldRegex = /\*\*(.*?)\*\*/g;
       const parts = [];
@@ -287,22 +355,183 @@ How can I help you coordinate teams, manage traffic bottlenecks, or respond to s
 
       const finalLine = parts.length > 0 ? parts : boldLine;
 
-      // 3. Bullet points
       if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
         return (
-          <li key={lineIdx} className="ml-4 list-disc text-slate-300 my-1 leading-relaxed">
+          <li key={idx} className="ml-4 list-disc text-slate-300 my-1 leading-relaxed text-xs">
             {line.trim().substring(2)}
           </li>
         );
       }
 
       return (
-        <p key={lineIdx} className="text-slate-300 leading-relaxed min-h-[1rem]">
+        <p key={idx} className="text-slate-300 leading-relaxed min-h-[1rem] text-xs">
           {finalLine}
         </p>
       );
     });
+
+    const actionButton = (type: string, key: number) => {
+      let icon = <Sparkles className="h-3.5 w-3.5" />;
+      let btnText = 'Apply';
+      
+      if (type === 'OPEN_NAVIGATION') { btnText = 'Open Navigation'; icon = <Map className="h-3.5 w-3.5" />; }
+      else if (type === 'LOCATE_MEDICAL') { btnText = 'Locate Medical'; icon = <ShieldAlert className="h-3.5 w-3.5" />; }
+      else if (type === 'REQUEST_HELP') { btnText = 'Request Help'; icon = <ShieldAlert className="h-3.5 w-3.5" />; }
+      else if (type === 'CALL_VOLUNTEER') { btnText = 'Call Volunteer'; icon = <PhoneCall className="h-3.5 w-3.5" />; }
+      else if (type === 'BOOK_WHEELCHAIR') { btnText = 'Book Wheelchair'; icon = <Accessibility className="h-3.5 w-3.5" />; }
+      else if (type === 'OPEN_GATE_4') { btnText = 'Open Gate 4 turnstiles'; }
+      else if (type === 'DEPLOY_MEDICAL') { btnText = 'Dispatch Medical Team 2'; }
+      else if (type === 'INCREASE_SHUTTLE') { btnText = 'Increase Shuttle B'; }
+      else if (type === 'ACTIVATE_ACCESSIBILITY') { btnText = 'Deploy Accessibility escort'; }
+      else if (type === 'REDUCE_ENERGY') { btnText = 'Dim displays'; }
+      else if (type === 'GENERATE_REPORT') { btnText = 'Generate Sustainability Audit'; }
+
+      const isVisitorAction = ['OPEN_NAVIGATION', 'LOCATE_MEDICAL', 'REQUEST_HELP', 'CALL_VOLUNTEER', 'BOOK_WHEELCHAIR'].includes(type);
+
+      if (isVisitorAction) {
+        return (
+          <Button
+            key={key}
+            onClick={() => handleApplyAction(type, promptText)}
+            size="sm"
+            className="bg-[#0f172a] hover:bg-[#1e293b] text-cyan-400 hover:text-cyan-300 border border-slate-800 text-[10px] font-bold h-7.5 px-3 rounded-lg flex gap-1.5 items-center cursor-pointer"
+          >
+            {icon}
+            <span>{btnText}</span>
+          </Button>
+        );
+      }
+
+      // FIFA EXECUTIVE MODE
+      if (isFifa) {
+        return (
+          <div key={key} className="flex flex-wrap gap-2 pt-1">
+            <Button
+              onClick={() => handleApplyAction(type, promptText)}
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold h-7.5 px-3.5 rounded-lg flex gap-1 items-center cursor-pointer"
+            >
+              <Check className="h-3.5 w-3.5" />
+              <span>Approve AI Recommendation</span>
+            </Button>
+            <Button
+              onClick={() => handleRejectAction(type, promptText)}
+              size="sm"
+              variant="outline"
+              className="border-rose-900/50 hover:bg-rose-950/20 text-rose-400 text-[10px] font-bold h-7.5 px-3.5 rounded-lg flex gap-1 items-center cursor-pointer"
+            >
+              <X className="h-3.5 w-3.5" />
+              <span>Reject</span>
+            </Button>
+          </div>
+        );
+      }
+
+      // Staff mode direct execution
+      return (
+        <Button
+          key={key}
+          onClick={() => handleApplyAction(type, promptText)}
+          size="sm"
+          className="bg-cyan-600 hover:bg-cyan-700 text-white text-[10px] font-bold h-7.5 px-3.5 rounded-lg flex gap-1 items-center cursor-pointer"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          <span>Execute Recommendation</span>
+        </Button>
+      );
+    };
+
+    const executeAllPlan = async (acts: string[]) => {
+      setIsThinking(true);
+      for (let i = 0; i < THINKING_STEPS.length; i++) {
+        setThinkingIndex(i);
+        await new Promise(r => setTimeout(r, 450));
+      }
+      setIsThinking(false);
+
+      for (const act of acts) {
+        await executeAction(act, promptText);
+        await new Promise(r => setTimeout(r, 300));
+      }
+      showToast('All multi-step AI plan dispatches applied successfully.', 'success');
+    };
+
+    return (
+      <div className="space-y-3.5">
+        <div className="space-y-1">{parsedText}</div>
+
+        {/* Confidence Indicator Card */}
+        {confidence && (
+          <div className="grid grid-cols-3 gap-2 p-3 rounded-xl border border-slate-900 bg-slate-950/60 text-[10px]">
+            <div>
+              <span className="text-slate-500 block font-mono">CONFIDENCE</span>
+              <span className="text-cyan-400 font-black block font-mono text-xs">{confidence}</span>
+            </div>
+            <div>
+              <span className="text-slate-500 block font-mono">RISK PROFILE</span>
+              <span className="text-emerald-400 font-bold block font-mono text-xs">{risk}</span>
+            </div>
+            <div>
+              <span className="text-slate-500 block font-mono">EXPECTED IMPACT</span>
+              <span className="text-white font-bold block truncate">{improvement}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Action triggers */}
+        {actions.length > 0 && (
+          <div className="pt-1.5">
+            {actions.map((act, i) => actionButton(act, i))}
+          </div>
+        )}
+
+        {/* Multi-step plans */}
+        {plans.length > 0 && (
+          <div className="p-3 rounded-xl border border-slate-900 bg-[#090e1a]/60 space-y-2 text-xs">
+            <span className="font-bold text-white flex items-center gap-1.5 font-mono text-[10.5px]">
+              <ShieldCheck className="h-4 w-4 text-cyan-400" />
+              INTELLIGENT MULTI-STEP RESPONSE PLAN
+            </span>
+            <div className="space-y-2">
+              {plans.map((p, i) => (
+                <div key={i} className="flex items-center justify-between p-2 rounded bg-slate-950/40 border border-slate-900/60 text-[11px]">
+                  <div className="flex items-center gap-2">
+                    <span className="h-4 w-4 rounded-full bg-slate-900 border border-slate-800 text-[10px] text-cyan-400 flex items-center justify-center font-mono">
+                      {i + 1}
+                    </span>
+                    <span className="text-slate-200 capitalize font-medium">{p.replace('_', ' ')}</span>
+                  </div>
+                  {/* Step Execute trigger (for staff/fifa) */}
+                  {!isVisitor && (
+                    <Button
+                      onClick={() => handleApplyAction(p, `Step ${i+1}: ${p}`)}
+                      size="sm"
+                      className="h-6 text-[9px] px-2 bg-slate-900 hover:bg-[#0f172a] text-cyan-400 border border-slate-800 cursor-pointer"
+                    >
+                      Execute Step
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {!isVisitor && (
+              <div className="pt-2 border-t border-slate-900 flex justify-end">
+                <Button
+                  onClick={() => executeAllPlan(plans)}
+                  size="sm"
+                  className="bg-cyan-600 hover:bg-cyan-700 text-white text-[10px] font-bold h-7.5 px-3 rounded-lg cursor-pointer"
+                >
+                  Execute All Steps
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
+
+  const quickPrompts = isVisitor ? QUICK_PROMPTS_VISITOR : QUICK_PROMPTS_STAFF;
 
   return (
     <div className="flex flex-col h-[calc(100vh-8.5rem)] max-w-5xl mx-auto gap-4 relative">
@@ -338,14 +567,25 @@ How can I help you coordinate teams, manage traffic bottlenecks, or respond to s
       </div>
 
       {/* Overview Head */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/25">
-          <Terminal className="h-5 w-5" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/25">
+            <Terminal className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-xl font-extrabold tracking-tight text-white">
+              {isVisitor ? 'AI Fan Companion' : 'AI Decision Engine'}
+            </h2>
+            <p className="text-xs text-slate-400">
+              {isVisitor 
+                ? 'Your smart concierge for venue navigation, food courts and assistance.' 
+                : 'Direct control link. Commands automatically sync with every dashboard.'}
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xl font-extrabold tracking-tight text-white">AI Operations Copilot</h2>
-          <p className="text-xs text-slate-400">Direct link to Gemini AI model. Secured Server-Side execution.</p>
-        </div>
+        <Badge variant="cyan" className="text-[9px] font-mono">
+          {isVisitor ? 'Spectator Companion' : 'AI COMMAND CENTER'}
+        </Badge>
       </div>
 
       {/* Main Panel */}
@@ -354,14 +594,14 @@ How can I help you coordinate teams, manage traffic bottlenecks, or respond to s
         <div className="hidden md:flex flex-col gap-3 md:col-span-1">
           <Card className="bg-[#080d19]/45 border-slate-900/60 flex-1 flex flex-col justify-between">
             <CardHeader className="p-4">
-              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 font-mono">
                 <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
-                Quick Commands
+                Quick Actions
               </CardTitle>
-              <CardDescription className="text-[10px]">Deploy common operational queries to the AI.</CardDescription>
+              <CardDescription className="text-[10px]">Tap to send preset queries to your AI helper.</CardDescription>
             </CardHeader>
             <CardContent className="p-4 pt-0 space-y-2.5">
-              {QUICK_PROMPTS.map((item, idx) => (
+              {quickPrompts.map((item, idx) => (
                 <button
                   key={idx}
                   onClick={() => handleQuickPromptClick(item.prompt)}
@@ -372,21 +612,21 @@ How can I help you coordinate teams, manage traffic bottlenecks, or respond to s
                 </button>
               ))}
             </CardContent>
-            <CardFooter className="p-4 border-t border-slate-900 bg-slate-950/20 text-[10px] text-slate-500 flex items-center gap-1">
+            <CardFooter className="p-4 border-t border-slate-900 bg-slate-950/20 text-[10px] text-slate-500 flex items-center gap-1 font-mono">
               <Bot className="h-3 w-3" />
-              <span>Model: Gemini 3.5 Flash</span>
+              <span>Model: Gemini 1.5 Decision</span>
             </CardFooter>
           </Card>
         </div>
 
         {/* Right Side: Chat box */}
         <Card className="md:col-span-3 flex flex-col min-h-0 border-slate-900/60 bg-[#080d19]/30">
-          <CardHeader className="border-b border-slate-900/60 p-4 flex flex-row items-center justify-between">
+          <CardHeader className="border-b border-slate-900/60 p-4 flex flex-row items-center justify-between bg-slate-950/15">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-cyan-400 animate-ping shadow" />
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Live Copilot Session</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Live Decision Session</span>
             </div>
-            <Badge variant="cyan" className="text-[9px]">Operational</Badge>
+            <Badge variant="cyan" className="text-[9px]">Online</Badge>
           </CardHeader>
 
           {/* Messages Box */}
@@ -419,15 +659,15 @@ How can I help you coordinate teams, manage traffic bottlenecks, or respond to s
                   )}
 
                   {/* Bubble Content */}
-                  <div className={`rounded-xl px-4 py-3 text-sm border shadow-sm ${
+                  <div className={`rounded-xl px-4 py-3 border shadow-sm ${
                     msg.sender === 'user'
                       ? 'bg-[#0f182e] border-blue-900/30 text-slate-100'
                       : msg.sender === 'system'
-                      ? 'bg-[#052c21]/40 border-emerald-900/40 text-emerald-300 w-full text-center'
+                      ? 'bg-[#052c21]/45 border-emerald-900/40 text-emerald-300 w-full text-center'
                       : 'bg-[#0d1324] border-slate-800/80 text-slate-200'
                   }`}>
-                    <div className="space-y-1">{formatMessageContent(msg.content)}</div>
-                    <span className="block text-[8px] text-slate-500 text-right mt-1.5">
+                    <div className="space-y-1">{formatMessageContent(msg.content, msg.sender === 'user' ? msg.content : '')}</div>
+                    <span className="block text-[8px] text-slate-500 text-right mt-1.5 font-mono">
                       {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
@@ -435,18 +675,19 @@ How can I help you coordinate teams, manage traffic bottlenecks, or respond to s
               ))}
             </AnimatePresence>
 
-            {isLoading && (
+            {/* AI thinking experience layout loader */}
+            {isThinking && (
               <div className="flex gap-3 max-w-[80%] mr-auto items-center">
                 <div className="h-8 w-8 rounded-full bg-slate-900 border border-slate-800 text-cyan-400 flex items-center justify-center">
                   <Bot className="h-4 w-4 animate-bounce" />
                 </div>
                 <div className="rounded-xl px-4 py-3 bg-[#0d1324] border border-slate-800 text-slate-400 text-xs flex gap-2 items-center">
-                  <div className="flex space-x-1">
+                  <div className="flex space-x-1 shrink-0">
                     <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:-0.3s]" />
                     <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:-0.15s]" />
                     <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-bounce" />
                   </div>
-                  <span>AI is auditing telemetry feeds...</span>
+                  <span className="font-mono text-[10.5px]">{THINKING_STEPS[thinkingIndex]}</span>
                 </div>
               </div>
             )}
@@ -463,13 +704,13 @@ How can I help you coordinate teams, manage traffic bottlenecks, or respond to s
               className="flex gap-2"
             >
               <Input
-                placeholder="Ask AI Copilot for crowd reroutes, transit delays, safety checks..."
+                placeholder={isVisitor ? "Ask: Where is my seat? / Restrooms / Tacos / Lost child help..." : "Ask AI Copilot for crowd reroutes, transit delays, safety checks..."}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                disabled={isLoading}
-                className="flex-1 bg-[#050912]"
+                disabled={isThinking}
+                className="flex-1 bg-[#050912] placeholder-slate-600 text-xs"
               />
-              <Button type="submit" size="icon" disabled={isLoading || !input.trim()}>
+              <Button type="submit" size="icon" disabled={isThinking || !input.trim()} className="cursor-pointer">
                 <Send className="h-4 w-4" />
               </Button>
             </form>

@@ -1,122 +1,60 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useStadium } from '@/components/stadium/StadiumContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { DatabaseService } from '@/lib/db';
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, PieChart, Pie, Cell 
 } from 'recharts';
 import { 
-  Trophy, Globe, TrendingUp, Users, Shield, Leaf, DollarSign, Activity, RefreshCw, Landmark 
+  Trophy, Globe, TrendingUp, Users, Shield, Leaf, DollarSign, Activity, RefreshCw, Landmark, 
+  Sparkles, Clock, AlertTriangle, CheckCircle, Undo2, Info
 } from 'lucide-react';
 
 export default function FifaBoardDashboard() {
   const { user } = useAuth();
-  const [mounted, setMounted] = useState(false);
+  const { 
+    stadiumHealth, healthScore, visitors, alerts, transport, sustainability, timeline, history, rollbackOperation
+  } = useStadium();
+
   const [refreshing, setRefreshing] = useState(false);
 
-  // Live telemetry states
-  const [metrics, setMetrics] = useState({
-    attendance: 324500,
+  // Broadcast and revenue telemetry
+  const metrics = {
     broadcast: 428.5,
     concurrent: 24.3,
     revenue: 23.68,
-    safety: 99.8
-  });
+  };
 
-  const [stadiumStatus, setStadiumStatus] = useState([
-    { name: 'Stadium Alpha (Vancouver)', occupancy: 94, status: 'stable', alerts: 0, health: 'Excellent' },
-    { name: 'Stadium Beta (Seattle)', occupancy: 88, status: 'stable', alerts: 1, health: 'Good' },
-    { name: 'Stadium Gamma (Los Angeles)', occupancy: 98, status: 'critical', alerts: 2, health: 'Under Monitoring' },
-  ]);
+  const stadiumStatus = [
+    { name: 'Stadium Alpha (Vancouver)', occupancy: 94, health: 'Excellent' },
+    { name: 'Stadium Beta (Seattle)', occupancy: 88, health: 'Good' },
+    { name: 'Stadium Gamma (Los Angeles)', occupancy: 98, health: 'Under Monitoring' },
+  ];
 
-  const [sustainMix, setSustainMix] = useState([
-    { name: 'Solar Energy', value: 65 },
+  const sustainMix = [
+    { name: 'Solar Energy', value: sustainability.renewablePercentage - 20 },
     { name: 'Grid Batteries', value: 20 },
-    { name: 'Wind Energy', value: 15 },
-  ]);
+    { name: 'Wind Energy', value: 100 - sustainability.renewablePercentage },
+  ];
 
-  const [revenueData, setRevenueData] = useState([
+  const revenueData = [
     { day: 'Match 1', tickets: 2400000, food: 650000, merch: 420000 },
     { day: 'Match 2', tickets: 2850000, food: 720000, merch: 480000 },
     { day: 'Match 3', tickets: 3100000, food: 810000, merch: 560000 },
     { day: 'Match 4', tickets: 3600000, food: 950000, merch: 690000 },
     { day: 'Match 5', tickets: 4200000, food: 1100000, merch: 820000 },
-  ]);
+  ];
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Live simulation telemetry interval
-  useEffect(() => {
-    if (!mounted) return;
-
-    const interval = setInterval(() => {
-      // 1. Fluctuate viewers, revenue and metrics
-      setMetrics(prev => {
-        const streamDelta = (Math.random() * 0.4 - 0.2); // ±0.2M
-        const revDelta = Math.random() * 0.05; // +$50k
-        return {
-          ...prev,
-          broadcast: parseFloat((prev.broadcast + (Math.random() > 0.6 ? streamDelta : 0)).toFixed(1)),
-          concurrent: parseFloat((prev.concurrent + streamDelta).toFixed(1)),
-          revenue: parseFloat((prev.revenue + revDelta).toFixed(2))
-        };
-      });
-
-      // 2. Fluctuate stadium occupancies
-      setStadiumStatus(prev => prev.map(st => {
-        const change = Math.floor(Math.random() * 3) - 1; // ±1%
-        const newOcc = Math.min(100, Math.max(70, st.occupancy + change));
-        return { ...st, occupancy: newOcc };
-      }));
-
-      // 3. Fluctuations in energy mix percentages
-      setSustainMix(prev => {
-        const solarVal = Math.min(75, Math.max(50, prev[0].value + (Math.random() > 0.5 ? 1 : -1)));
-        const batteryVal = Math.min(30, Math.max(10, prev[1].value + (Math.random() > 0.5 ? 1 : -1)));
-        const windVal = 100 - solarVal - batteryVal;
-        return [
-          { name: 'Solar Energy', value: solarVal },
-          { name: 'Grid Batteries', value: batteryVal },
-          { name: 'Wind Energy', value: windVal }
-        ];
-      });
-
-      // 4. Update latest Match 5 revenue metrics slightly
-      setRevenueData(prev => {
-        return prev.map((item, idx) => {
-          if (idx === prev.length - 1) {
-            return {
-              ...item,
-              tickets: item.tickets + Math.floor(Math.random() * 12000),
-              food: item.food + Math.floor(Math.random() * 4000),
-              merch: item.merch + Math.floor(Math.random() * 3000)
-            };
-          }
-          return item;
-        });
-      });
-
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [mounted]);
-
-  const handleRefresh = () => {
+  const handleRefreshClick = () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-      // Boost ticket sales on refresh
-      setMetrics(prev => ({ ...prev, revenue: parseFloat((prev.revenue + 0.08).toFixed(2)) }));
-    }, 1000);
+    setTimeout(() => setRefreshing(false), 800);
   };
 
-  if (!mounted || !user) return null;
+  if (!user) return null;
 
   const SUSTAIN_COLORS = ['#10b981', '#059669', '#34d399'];
 
@@ -138,7 +76,7 @@ export default function FifaBoardDashboard() {
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={handleRefresh} 
+            onClick={handleRefreshClick} 
             disabled={refreshing}
             className="text-xs flex gap-1.5 items-center border-slate-800 bg-[#0c101d] text-amber-400 hover:text-amber-300 cursor-pointer"
           >
@@ -148,75 +86,179 @@ export default function FifaBoardDashboard() {
         </div>
       </div>
 
-      {/* TOURNAMENT KPI STATS CARD */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Total Attendance */}
-        <Card className="bg-[#080d19]/45 border-slate-900/60 relative overflow-hidden">
-          <div className="absolute top-0 right-0 h-16 w-16 -translate-y-4 translate-x-4 rounded-full bg-blue-500/5" />
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400 font-mono">Global Attendance</CardTitle>
-            <Users className="h-4 w-4 text-cyan-400" />
+      {/* Global Match Center & AI Predictive Projections */}
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* Match Center Card (Executive Overview) */}
+        <Card className="md:col-span-2 bg-[#080d19]/45 border-slate-900/60 overflow-hidden relative flex flex-col justify-between">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-amber-500/5 to-transparent blur-3xl rounded-full" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-white">
+                <Trophy className="h-4.5 w-4.5 text-amber-400" />
+                Global Match Center (Executive View)
+              </span>
+              <Badge variant="warning" className="text-[9px] uppercase tracking-wider font-mono">Quarter Final</Badge>
+            </CardTitle>
+            <CardDescription className="text-xs">Seattle Stadium Command Center Telemetry</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-black text-white">{metrics.attendance.toLocaleString()}</div>
-            <p className="text-[10px] text-emerald-400 mt-1 flex items-center gap-1 font-mono">
-              <TrendingUp className="h-3 w-3" /> +14.2% over projections
-            </p>
+          <CardContent className="pt-2 space-y-4 flex-1 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-center bg-slate-950/40 border border-slate-900 rounded-xl p-4">
+              <div className="flex-1">
+                <span className="text-2xl font-black block text-white">ARG</span>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Argentina</span>
+              </div>
+              <div className="px-4">
+                <span className="text-[9px] font-mono font-bold text-amber-400 block mb-1">COUNTDOWN</span>
+                <Badge variant="secondary" className="font-mono text-sm py-1 px-3 bg-blue-950/80 text-blue-300 border border-blue-800/40">1h 24m</Badge>
+              </div>
+              <div className="flex-1">
+                <span className="text-2xl font-black block text-white">GER</span>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Germany</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3.5 text-xs text-center">
+              <div className="p-2.5 rounded-lg border border-slate-800 bg-[#070b13]/30">
+                <span className="text-slate-500 block text-[9px] uppercase font-mono mb-0.5">Broadcast Streams</span>
+                <span className="text-white font-bold">{metrics.broadcast}M Streams</span>
+              </div>
+              <div className="p-2.5 rounded-lg border border-slate-800 bg-[#070b13]/30">
+                <span className="text-slate-500 block text-[9px] uppercase font-mono mb-0.5">Corporate Boxes</span>
+                <span className="text-emerald-400 font-bold">100% Occupied</span>
+              </div>
+              <div className="p-2.5 rounded-lg border border-slate-800 bg-[#070b13]/30">
+                <span className="text-slate-500 block text-[9px] uppercase font-mono mb-0.5">VIP Attendees</span>
+                <span className="text-white font-bold">FIFA delegation</span>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center text-[10px] text-slate-500 border-t border-slate-900/60 pt-3">
+              <span>Referee: Piero Maza (Chile)</span>
+              <span>Matchday Merch Gross: <strong className="text-emerald-400">$820,000</strong></span>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Global Broadcast Viewers */}
-        <Card className="bg-[#080d19]/45 border-slate-900/60 relative overflow-hidden">
-          <div className="absolute top-0 right-0 h-16 w-16 -translate-y-4 translate-x-4 rounded-full bg-amber-500/5" />
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400 font-mono">TV & Digital Viewers</CardTitle>
-            <Globe className="h-4 w-4 text-amber-400" />
+        {/* AI Predictions */}
+        <Card className="bg-[#080d19]/45 border-slate-900/60 overflow-hidden relative flex flex-col justify-between">
+          <CardHeader className="pb-3 border-b border-slate-900/60">
+            <CardTitle className="text-sm font-semibold flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-white">
+                <Sparkles className="h-4.5 w-4.5 text-cyan-400" />
+                AI Risk Projections
+              </span>
+              <Badge variant="cyan" className="text-[9px] uppercase font-mono">Predictive</Badge>
+            </CardTitle>
+            <CardDescription className="text-xs">Capacity projections in the next hour</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-black text-white">{metrics.broadcast} M</div>
-            <p className="text-[10px] text-slate-400 mt-1 font-mono">Peak: {metrics.concurrent} M concurrent streams</p>
-          </CardContent>
-        </Card>
-
-        {/* Cumulative Revenue */}
-        <Card className="bg-[#080d19]/45 border-slate-900/60 relative overflow-hidden">
-          <div className="absolute top-0 right-0 h-16 w-16 -translate-y-4 translate-x-4 rounded-full bg-emerald-500/5" />
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400 font-mono">Total Portal Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-emerald-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-black text-white">${metrics.revenue} M</div>
-            <p className="text-[10px] text-emerald-400 mt-1 flex items-center gap-1 font-mono">
-              <TrendingUp className="h-3 w-3" /> Ad-sponsorship margins peak
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Security Index */}
-        <Card className="bg-[#080d19]/45 border-slate-900/60 relative overflow-hidden">
-          <div className="absolute top-0 right-0 h-16 w-16 -translate-y-4 translate-x-4 rounded-full bg-purple-500/5" />
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400 font-mono">Safety Guarantee Index</CardTitle>
-            <Shield className="h-4 w-4 text-purple-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-black text-white">{metrics.safety}%</div>
-            <p className="text-[10px] text-slate-400 mt-1 font-mono">Response threshold: &lt; 90 seconds</p>
+          <CardContent className="pt-4 space-y-3 flex-1 flex flex-col justify-between">
+            <div className="space-y-2 text-[10px] leading-snug">
+              <div className="p-2 border border-slate-900 bg-slate-950/45 rounded flex justify-between items-center">
+                <span className="text-slate-300">Gate 3 likely to exceed capacity in 18 minutes.</span>
+                <span className="text-cyan-400 font-bold font-mono ml-2">92%</span>
+              </div>
+              <div className="p-2 border border-slate-900 bg-slate-950/45 rounded flex justify-between items-center">
+                <span className="text-slate-300">Food Court A concessions projected to peak at halftime.</span>
+                <span className="text-cyan-400 font-bold font-mono ml-2">88%</span>
+              </div>
+              <div className="p-2 border border-slate-900 bg-slate-950/45 rounded flex justify-between items-center">
+                <span className="text-slate-300">Metro station departure load forecast peak in 45 mins.</span>
+                <span className="text-cyan-400 font-bold font-mono ml-2">94%</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* REVENUE DASHBOARD GRAPH & MULTI STADIUM ANALYTICS */}
+      {/* EXECUTIVE AI INSIGHTS PANEL */}
+      <Card className="bg-[#080d19]/45 border-slate-900/60 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(234,179,8,0.02),transparent)] pointer-events-none" />
+        <CardHeader className="pb-3 border-b border-slate-900/40">
+          <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-white">
+            <Sparkles className="h-4.5 w-4.5 text-amber-400" />
+            Executive Intelligence Insights
+          </CardTitle>
+          <CardDescription className="text-xs">AI recommendations and environmental checks</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-4 space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {/* Green Card */}
+            <div className="p-3.5 rounded-xl border border-emerald-900/30 bg-emerald-950/10 text-xs space-y-1">
+              <div className="flex items-center gap-1.5 font-bold text-emerald-400">
+                <CheckCircle className="h-4 w-4" />
+                <span>Attendance & Safety</span>
+              </div>
+              <p className="text-slate-300 text-[11px] leading-relaxed">
+                Attendance exceeded baseline expectations by 7%. Emergency response index improved by 18% (average threshold: 54 seconds).
+              </p>
+            </div>
+            {/* Amber Card */}
+            <div className="p-3.5 rounded-xl border border-amber-900/30 bg-amber-950/10 text-xs space-y-1">
+              <div className="flex items-center gap-1.5 font-bold text-amber-400">
+                <AlertTriangle className="h-4 w-4" />
+                <span>Gate & Crowd Flows</span>
+              </div>
+              <p className="text-slate-300 text-[11px] leading-relaxed">
+                Gate 3 remains the busiest entrance (92% load). Recommended Action: **Increase volunteers near Gate 3** concourse immediately.
+              </p>
+            </div>
+            {/* Red Card */}
+            <div className="p-3.5 rounded-xl border border-rose-900/30 bg-rose-950/10 text-xs space-y-1">
+              <div className="flex items-center gap-1.5 font-bold text-rose-400">
+                <AlertTriangle className="h-4 w-4" />
+                <span>Energy & Transport Limits</span>
+              </div>
+              <p className="text-slate-300 text-[11px] leading-relaxed">
+                Food Court waiting times remain above target limits. Recommended Action: **Deploy standby electric shuttles** to Gate B.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* EXECUTIVE KPI CENTER */}
+      <Card className="bg-[#080d19]/45 border-slate-900/60">
+        <CardHeader className="pb-3 border-b border-slate-900/40">
+          <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-white">
+            <Activity className="h-4.5 w-4.5 text-cyan-400" />
+            Executive KPI Center
+          </CardTitle>
+          <CardDescription className="text-xs">Primary operational indexes with historical trend drifts</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-4 grid gap-3.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 text-center text-xs">
+          {[
+            { label: 'Fan Satisfaction', value: '94%', trend: '▲ +1.2%', variant: 'success' },
+            { label: 'Security Index', value: '99.8%', trend: 'Stable', variant: 'cyan' },
+            { label: 'Operational Efficiency', value: '92%', trend: '▲ +3.4%', variant: 'success' },
+            { label: 'Accessibility Score', value: '96%', trend: 'Stable', variant: 'cyan' },
+            { label: 'Sustainability Score', value: '98%', trend: '▲ +2.0%', variant: 'success' },
+            { label: 'Transport Efficiency', value: '91%', trend: '▼ -1.5%', variant: 'warning' },
+            { label: 'Revenue Per Visitor', value: '$128.50', trend: '▲ +4.3%', variant: 'success' },
+            { label: 'Average Queue Time', value: '4.5 mins', trend: '▼ -12%', variant: 'success' },
+            { label: 'Medical Response Time', value: '54s', trend: '▲ +18%', variant: 'success' },
+            { label: 'Stadium Health Score', value: `${healthScore}/100`, trend: stadiumHealth, variant: stadiumHealth === 'Excellent' || stadiumHealth === 'Good' ? 'success' : 'warning' }
+          ].map((kpi, idx) => (
+            <div key={idx} className="p-3 rounded-xl border border-slate-900 bg-slate-950/45 flex flex-col justify-between">
+              <span className="text-slate-500 block text-[9.5px] uppercase font-mono tracking-wider mb-1">{kpi.label}</span>
+              <span className="text-lg font-black text-white block font-mono">{kpi.value}</span>
+              <Badge variant={kpi.variant as any} className="text-[8px] py-0 font-mono mt-1 justify-center">
+                {kpi.trend}
+              </Badge>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* REVENUE GRAPH & TIMELINE ROW */}
       <div className="grid gap-6 md:grid-cols-3">
         {/* Revenue Graph */}
         <Card className="md:col-span-2 bg-[#080d19]/45 border-slate-900/60">
           <CardHeader>
-            <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-white">
-              <Landmark className="h-4 w-4 text-emerald-400" />
+            <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-emerald-400">
+              <Landmark className="h-4 w-4" />
               Tournament Revenue Stream Analysis ($ USD)
             </CardTitle>
-            <CardDescription className="text-xs">Ticket sales, concessions (food/beverage), and merchandise gross metrics</CardDescription>
+            <CardDescription className="text-xs">Concession sales, ticket gains, and merchandise metrics</CardDescription>
           </CardHeader>
           <CardContent className="h-80">
             <ResponsiveContainer width="100%" height="100%">
@@ -254,8 +296,57 @@ export default function FifaBoardDashboard() {
           </CardContent>
         </Card>
 
+        {/* AI Operations History Panel */}
+        <Card className="flex flex-col h-[370px] bg-[#080d19]/45 border-slate-900/60">
+          <CardHeader className="pb-3 border-b border-slate-900/30">
+            <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-white">
+              <Clock className="h-4.5 w-4.5 text-cyan-400" />
+              AI Operations History
+            </CardTitle>
+            <CardDescription className="text-xs">History logs and rollback controls</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 overflow-y-auto px-6 py-4 space-y-3.5">
+            {history.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-slate-500 text-xs py-8">
+                <Info className="h-8 w-8 text-slate-600 mb-2" />
+                <span>No Operations Executed Yet</span>
+                <span className="text-[9px] text-slate-600 mt-1">Submit prompt actions in AI Assistant.</span>
+              </div>
+            ) : (
+              history.map((item) => (
+                <div key={item.id} className="p-3 rounded-lg border border-slate-900 bg-slate-950/20 text-xs space-y-1.5">
+                  <div className="flex justify-between items-center font-bold">
+                    <span className="text-white capitalize">{item.actionName.replace('_', ' ')}</span>
+                    <Badge variant={item.status === 'success' ? 'success' : item.status === 'cancelled' ? 'secondary' : 'warning'} className="text-[8px] font-mono">
+                      {item.status}
+                    </Badge>
+                  </div>
+                  <p className="text-[10px] text-slate-400 italic">"{item.prompt}"</p>
+                  <p className="text-[11px] text-slate-200">{item.outcome}</p>
+                  {item.status === 'success' && (
+                    <div className="flex justify-end pt-1">
+                      <Button
+                        onClick={() => rollbackOperation(item.id)}
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-[9px] text-amber-500 hover:bg-amber-950/20 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Undo2 className="h-3 w-3" />
+                        <span>Undo Operation</span>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* MULTI STADIUM, SUSTAINABILITY & SECURITY DETAILED SPLITS */}
+      <div className="grid gap-6 md:grid-cols-3">
         {/* Multi-Stadium Monitoring */}
-        <Card className="bg-[#080d19]/45 border-slate-900/60 flex flex-col h-[400px]">
+        <Card className="bg-[#080d19]/45 border-slate-900/60 flex flex-col h-[320px]">
           <CardHeader className="pb-3 border-b border-slate-900/30">
             <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-white">
               <Activity className="h-4.5 w-4.5 text-cyan-400" />
@@ -263,56 +354,24 @@ export default function FifaBoardDashboard() {
             </CardTitle>
             <CardDescription className="text-xs">Live status across tournament venues</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          <CardContent className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
             {stadiumStatus.map((stadium, idx) => (
-              <div key={idx} className="p-3.5 rounded-lg border border-slate-900 bg-slate-950/30 text-xs space-y-2">
+              <div key={idx} className="p-3 rounded-lg border border-slate-900 bg-slate-950/30 text-xs space-y-1.5">
                 <div className="flex justify-between items-start">
                   <h4 className="font-bold text-white leading-tight">{stadium.name}</h4>
-                  <Badge variant={stadium.status === 'critical' ? 'destructive' : 'success'} className="text-[8px] py-0 px-1.5 uppercase font-mono">
+                  <Badge variant="success" className="text-[8px] py-0 font-mono">
                     {stadium.health}
                   </Badge>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-2 border-t border-slate-900/60 pt-2 text-[10px] text-slate-400 font-mono">
+                <div className="grid grid-cols-2 gap-2 border-t border-slate-900/40 pt-1 text-[9px] text-slate-400 font-mono">
                   <div>
                     Occupancy: <span className="text-white font-bold">{stadium.occupancy}%</span>
                   </div>
                   <div>
-                    Active Alerts: <span className={stadium.alerts > 0 ? "text-amber-400 font-bold" : "text-white font-bold"}>{stadium.alerts}</span>
+                    Active Alerts: <span className="text-white font-bold">{alerts.filter(a => a.status !== 'resolved').length}</span>
                   </div>
                 </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* CROWD SUMMARY, SUSTAINABILITY & SECURITY OVERVIEW */}
-      <div className="grid gap-6 md:grid-cols-3">
-        {/* Crowd Density Summary */}
-        <Card className="bg-[#080d19]/45 border-slate-900/60 flex flex-col h-[320px]">
-          <CardHeader className="pb-3 border-b border-slate-900/30">
-            <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-blue-400">
-              <Users className="h-4.5 w-4.5" />
-              Spectator Volume Summary
-            </CardTitle>
-            <CardDescription className="text-xs">Total gate throughput & congestion rates</CardDescription>
-          </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto px-6 py-4 space-y-3.5">
-            {[
-              { gate: 'Gate 1 (West Concourse)', rate: '430 fans / min', density: 'Moderate flow' },
-              { gate: 'Gate 2 (VIP Pavilion)', rate: '120 fans / min', density: 'Low flow' },
-              { gate: 'Gate 4 (General Admission)', rate: '860 fans / min', density: 'High density queue' },
-              { gate: 'Gate 5 (East Stand)', rate: '340 fans / min', density: 'Stable flow' },
-            ].map((g, idx) => (
-              <div key={idx} className="flex justify-between items-center text-xs p-2.5 rounded bg-slate-950/20 border border-slate-900">
-                <div>
-                  <h5 className="font-bold text-slate-200">{g.gate}</h5>
-                  <p className="text-[10px] text-slate-500 mt-0.5">{g.density}</p>
-                </div>
-                <Badge variant={g.density.includes('High') ? 'destructive' : g.density.includes('Moderate') ? 'warning' : 'success'} className="text-[9px] py-0 font-mono">
-                  {g.rate}
-                </Badge>
               </div>
             ))}
           </CardContent>
@@ -349,7 +408,7 @@ export default function FifaBoardDashboard() {
               </ResponsiveContainer>
             </div>
             
-            <div className="grid grid-cols-3 text-center text-[10px] text-slate-400 border-t border-slate-900/80 pt-3 font-mono">
+            <div className="grid grid-cols-3 text-center text-[9px] text-slate-400 border-t border-slate-900/80 pt-3 font-mono">
               {sustainMix.map((item, idx) => (
                 <div key={idx} className="flex flex-col items-center">
                   <span className="font-semibold truncate max-w-[85px]">{item.name}</span>
@@ -371,7 +430,7 @@ export default function FifaBoardDashboard() {
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
             <div className="p-3.5 rounded-lg border border-slate-900 bg-slate-950/20 text-xs">
-              <div className="flex justify-between items-center mb-1 text-[10px] font-bold text-slate-400 uppercase font-mono">
+              <div className="flex justify-between items-center mb-1 text-[9px] font-bold text-slate-400 uppercase font-mono">
                 <span>Security Patrols</span>
                 <span className="text-white">Active</span>
               </div>
@@ -379,7 +438,7 @@ export default function FifaBoardDashboard() {
             </div>
 
             <div className="p-3.5 rounded-lg border border-slate-900 bg-slate-950/20 text-xs">
-              <div className="flex justify-between items-center mb-1 text-[10px] font-bold text-slate-400 uppercase font-mono">
+              <div className="flex justify-between items-center mb-1 text-[9px] font-bold text-slate-400 uppercase font-mono">
                 <span>Response Times</span>
                 <span className="text-emerald-400">Target Met</span>
               </div>
@@ -387,7 +446,7 @@ export default function FifaBoardDashboard() {
             </div>
 
             <div className="p-3.5 rounded-lg border border-slate-900 bg-slate-950/20 text-xs">
-              <div className="flex justify-between items-center mb-1 text-[10px] font-bold text-slate-400 uppercase font-mono">
+              <div className="flex justify-between items-center mb-1 text-[9px] font-bold text-slate-400 uppercase font-mono">
                 <span>Medical Readiness</span>
                 <span className="text-white">Standby</span>
               </div>
