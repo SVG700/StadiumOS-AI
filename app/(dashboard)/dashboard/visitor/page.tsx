@@ -29,17 +29,27 @@ export default function VisitorDashboard() {
   // Chat/AI assistant preview state
   const [chatInput, setChatInput] = useState('');
 
-  useEffect(() => {
-    setMounted(true);
-    // Fetch data
+  const fetchVisitorData = () => {
     DatabaseService.getTransportStatus().then(setTransports).catch(console.error);
     DatabaseService.getAccessibilityRequests().then((reqs) => {
-      // Filter requests belonging to this user
       if (user?.email) {
         setAccessRequests(reqs.filter((r) => r.userEmail === user.email));
       }
     }).catch(console.error);
+  };
+
+  useEffect(() => {
+    setMounted(true);
+    fetchVisitorData();
   }, [user]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const interval = setInterval(() => {
+      fetchVisitorData();
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [mounted, user]);
 
   const handleAccessRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

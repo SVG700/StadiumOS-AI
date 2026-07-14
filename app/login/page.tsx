@@ -254,10 +254,21 @@ function LoginFormContent() {
         )}
 
         <div className="mt-5 text-center text-xs text-slate-500 border-t border-slate-900/60 pt-4">
-          Need a credentials clearance?{' '}
-          <Link href="/signup" className="font-semibold text-cyan-400 hover:text-cyan-300 hover:underline">
-            Request Account
-          </Link>
+          {selectedPortal === 'visitor' ? (
+            <>
+              New spectator?{' '}
+              <Link href="/signup?role=visitor" className="font-semibold text-cyan-400 hover:text-cyan-300 hover:underline">
+                Create Visitor Account
+              </Link>
+            </>
+          ) : (
+            <>
+              Need a credentials clearance?{' '}
+              <Link href="/signup" className="font-semibold text-cyan-400 hover:text-cyan-300 hover:underline">
+                Request Account
+              </Link>
+            </>
+          )}
         </div>
       </div>
 

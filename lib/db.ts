@@ -311,6 +311,23 @@ export class DatabaseService {
     return this.getLocal('stadium_sustainability_metrics', DEFAULT_SUSTAINABILITY_METRICS);
   }
 
+  static async updateSustainabilityMetrics(metrics: Partial<SustainabilityMetrics>): Promise<boolean> {
+    if (isSupabaseConfigured) {
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        const { error } = await supabase
+          .from('sustainability_metrics')
+          .update(metrics)
+          .eq('id', 1); // Assuming singular row
+        if (!error) return true;
+      }
+    }
+    const current = this.getLocal<SustainabilityMetrics>('stadium_sustainability_metrics', DEFAULT_SUSTAINABILITY_METRICS);
+    const updated = { ...current, ...metrics };
+    this.setLocal('stadium_sustainability_metrics', updated);
+    return true;
+  }
+
   // --- VOLUNTEER ACTIVITY ---
   static async getVolunteers(): Promise<VolunteerActivity[]> {
     if (isSupabaseConfigured) {
@@ -321,5 +338,53 @@ export class DatabaseService {
       }
     }
     return this.getLocal('stadium_volunteers', DEFAULT_VOLUNTEERS);
+  }
+
+  static async updateVolunteerStatus(id: string, status: VolunteerActivity['status'], task?: string, location?: string): Promise<boolean> {
+    if (isSupabaseConfigured) {
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        const updates: any = { status };
+        if (task) updates.task = task;
+        if (location) updates.location = location;
+        const { error } = await supabase
+          .from('volunteer_activity')
+          .update(updates)
+          .eq('id', id);
+        if (!error) return true;
+      }
+    }
+    const current = this.getLocal<VolunteerActivity[]>('stadium_volunteers', DEFAULT_VOLUNTEERS);
+    const updated = current.map(v => v.id === id ? { ...v, status, task: task || v.task, location: location || v.location } : v);
+    this.setLocal('stadium_volunteers', updated);
+    return true;
+  }
+
+  // --- CROWD DENSITY UPDATE ---
+  static async updateCrowdDensity(zone: string, density: number): Promise<boolean> {
+    if (isSupabaseConfigured) {
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        const { error } = await supabase
+          .from('crowd_density')
+          .update({ density })
+          .eq('zone', zone);
+        if (!error) return true;
+      }
+    }
+    const current = this.getLocal<CrowdDensity[]>('stadium_crowd_density', DEFAULT_CROWD_DENSITY);
+    const updated = current.map(c => {
+      if (c.zone === zone) {
+        const currentCount = Math.round((density / 100) * c.capacity);
+        let status: CrowdDensity['status'] = 'low';
+        if (density > 85) status = 'critical';
+        else if (density > 70) status = 'high';
+        else if (density > 45) status = 'moderate';
+        return { ...c, density, currentCount, status };
+      }
+      return c;
+    });
+    this.setLocal('stadium_crowd_density', updated);
+    return true;
   }
 }

@@ -18,35 +18,13 @@ import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ResponsiveContainer, 
-  AreaChart, 
-  Area, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  PieChart, 
-  Pie, 
-  Cell, 
-  Legend 
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell 
 } from 'recharts';
 import { 
-  Users, 
-  ShieldAlert, 
-  Activity, 
-  Bus, 
-  Accessibility, 
-  Leaf, 
-  Clock, 
-  UserCheck, 
-  PlusCircle, 
-  AlertTriangle,
-  RefreshCw,
-  ClipboardList,
-  AlertOctagon,
-  CheckSquare
+  Users, ShieldAlert, Activity, Bus, Accessibility, Leaf, Clock, UserCheck, PlusCircle, 
+  AlertTriangle, RefreshCw, ClipboardList, AlertOctagon, CheckSquare, Info, CheckCircle
 } from 'lucide-react';
 
 interface TaskAssignment {
@@ -66,6 +44,25 @@ interface IncidentReport {
   time: string;
 }
 
+interface Toast {
+  id: string;
+  message: string;
+  type: 'success' | 'info' | 'warning';
+}
+
+const DEFAULT_TASKS: TaskAssignment[] = [
+  { id: 't1', title: 'Verify wheelchair ramp deployment', assignee: 'Jane (Volunteer)', priority: 'medium', status: 'pending', location: 'Gate 4 North' },
+  { id: 't2', title: 'Inspect ticket scanners response lag', assignee: 'John (Tech Crew)', priority: 'high', status: 'pending', location: 'Gate B West' },
+  { id: 't3', title: 'Relocate extra wastepod unit', assignee: 'Dave (Ground Staff)', priority: 'low', status: 'completed', location: 'Concourse L1' },
+  { id: 't4', title: 'Distribute rain ponchos to zone volunteers', assignee: 'Sarah (Team Lead)', priority: 'medium', status: 'pending', location: 'East Pavilion' }
+];
+
+const DEFAULT_INCIDENTS: IncidentReport[] = [
+  { id: 'i1', issue: 'Spill reported near concession POD 3', reporter: 'Fan (reported via AI)', status: 'open', time: '5m ago' },
+  { id: 'i2', issue: 'Overcrowded stairwell queue', reporter: 'Security Crew #12', status: 'open', time: '12m ago' },
+  { id: 'i3', issue: 'Damaged seat Section 102 Row G', reporter: 'Volunteer 4', status: 'resolved', time: '40m ago' }
+];
+
 export default function StaffDashboard() {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -80,19 +77,10 @@ export default function StaffDashboard() {
   const [sustainability, setSustainability] = useState<SustainabilityMetrics | null>(null);
   const [volunteers, setVolunteers] = useState<VolunteerActivity[]>([]);
 
-  // Task & Incident mock states
-  const [tasks, setTasks] = useState<TaskAssignment[]>([
-    { id: 't1', title: 'Verify wheelchair ramp deployment', assignee: 'Jane (Volunteer)', priority: 'medium', status: 'pending', location: 'Gate 4 North' },
-    { id: 't2', title: 'Inspect ticket scanners response lag', assignee: 'John (Tech Crew)', priority: 'high', status: 'pending', location: 'Gate B West' },
-    { id: 't3', title: 'Relocate extra wastepod unit', assignee: 'Dave (Ground Staff)', priority: 'low', status: 'completed', location: 'Concourse L1' },
-    { id: 't4', title: 'Distribute rain ponchos to zone volunteers', assignee: 'Sarah (Team Lead)', priority: 'medium', status: 'pending', location: 'East Pavilion' }
-  ]);
-
-  const [incidents, setIncidents] = useState<IncidentReport[]>([
-    { id: 'i1', issue: 'Spill reported near concession POD 3', reporter: 'Fan (reported via AI)', status: 'open', time: '5m ago' },
-    { id: 'i2', issue: 'Overcrowded stairwell queue', reporter: 'Security Crew #12', status: 'open', time: '12m ago' },
-    { id: 'i3', issue: 'Damaged seat Section 102 Row G', reporter: 'Volunteer 4', status: 'resolved', time: '40m ago' }
-  ]);
+  // Task & Incident states
+  const [tasks, setTasks] = useState<TaskAssignment[]>([]);
+  const [incidents, setIncidents] = useState<IncidentReport[]>([]);
+  const [toasts, setToasts] = useState<Toast[]>([]);
 
   // Dialog control states
   const [isAlertOpen, setIsAlertOpen] = useState(false);
@@ -115,11 +103,96 @@ export default function StaffDashboard() {
   const [taskPriority, setTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [taskLocation, setTaskLocation] = useState('');
 
-  // Hydration fix
+  // Hydration and Initial data fetch
   useEffect(() => {
     setMounted(true);
     fetchData();
+
+    // Fetch tasks & incidents from localStorage
+    const savedTasks = localStorage.getItem('stadium_os_demo_tasks');
+    if (savedTasks) {
+      setTasks(JSON.parse(savedTasks));
+    } else {
+      setTasks(DEFAULT_TASKS);
+      localStorage.setItem('stadium_os_demo_tasks', JSON.stringify(DEFAULT_TASKS));
+    }
+
+    const savedIncidents = localStorage.getItem('stadium_os_demo_incidents');
+    if (savedIncidents) {
+      setIncidents(JSON.parse(savedIncidents));
+    } else {
+      setIncidents(DEFAULT_INCIDENTS);
+      localStorage.setItem('stadium_os_demo_incidents', JSON.stringify(DEFAULT_INCIDENTS));
+    }
   }, []);
+
+  // Live Simulation Timer (Objectives #6 - runs every 25 seconds)
+  useEffect(() => {
+    if (!mounted) return;
+
+    const interval = setInterval(async () => {
+      // 1. Simulate Crowd Density changes
+      try {
+        const crowd = await DatabaseService.getCrowdDensity();
+        const updated = crowd.map(c => {
+          const change = Math.floor(Math.random() * 7) - 3; // ±3%
+          const newDensity = Math.min(100, Math.max(5, c.density + change));
+          return {
+            ...c,
+            density: newDensity,
+            currentCount: Math.round((newDensity / 100) * c.capacity),
+            status: newDensity > 85 ? 'critical' as const : newDensity > 70 ? 'high' as const : newDensity > 45 ? 'moderate' as const : 'low' as const
+          };
+        });
+        localStorage.setItem('stadium_crowd_density', JSON.stringify(updated));
+        setCrowdDensity(updated);
+      } catch (e) {}
+
+      // 2. Fluctuate Transit ETAs
+      try {
+        const trans = await DatabaseService.getTransportStatus();
+        const updated = trans.map(t => {
+          const change = Math.random() > 0.5 ? 1 : -1;
+          const newEta = Math.max(1, t.etaMinutes + (Math.random() > 0.6 ? change : 0));
+          return { ...t, etaMinutes: newEta };
+        });
+        localStorage.setItem('stadium_transport_status', JSON.stringify(updated));
+        setTransport(updated);
+      } catch (e) {}
+
+      // 3. Fluctuate Energy Usage
+      try {
+        const sustainData = await DatabaseService.getSustainabilityMetrics();
+        const change = Math.floor(Math.random() * 60) - 30; // ±30 kW
+        const newUsage = Math.max(1000, sustainData.energyUsageKw + change);
+        const updated = { ...sustainData, energyUsageKw: newUsage };
+        localStorage.setItem('stadium_sustainability_metrics', JSON.stringify(updated));
+        setSustainability(updated);
+      } catch (e) {}
+
+      // 4. Update visitor counts
+      try {
+        const vis = await DatabaseService.getActiveVisitors();
+        const change = Math.floor(Math.random() * 12) - 6;
+        const newTotal = Math.max(50000, vis.total + change);
+        const updated = { ...vis, total: newTotal, fans: newTotal - vis.staff - vis.vip };
+        localStorage.setItem('stadium_active_visitors', JSON.stringify(updated));
+        setVisitors(updated);
+      } catch (e) {}
+
+      showToast('Live telemetry feeds updated with sensor metrics.', 'info');
+    }, 25000);
+
+    return () => clearInterval(interval);
+  }, [mounted]);
+
+  const showToast = (message: string, type: 'success' | 'info' | 'warning' = 'success') => {
+    const id = `toast-${Date.now()}`;
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  };
 
   const fetchData = async () => {
     setRefreshing(true);
@@ -150,7 +223,7 @@ export default function StaffDashboard() {
       setSustainability(sustainData);
       setVolunteers(volunteerData);
     } catch (e) {
-      console.error('Error fetching dashboard statistics:', e);
+      console.error('Error fetching statistics:', e);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -162,22 +235,40 @@ export default function StaffDashboard() {
     if (!alertTitle || !alertDesc || !alertLocation || !alertTeam) return;
 
     try {
-      await DatabaseService.addEmergencyAlert({
+      const newAlert = await DatabaseService.addEmergencyAlert({
         title: alertTitle,
         description: alertDesc,
         severity: alertSeverity,
         location: alertLocation,
         assignedTeam: alertTeam
       });
+      
+      // Update local incidents feed
+      const newIncident: IncidentReport = {
+        id: `inc-${newAlert.id}`,
+        issue: alertTitle,
+        reporter: 'Operations Dispatch',
+        status: 'open',
+        time: '1s ago'
+      };
+      const updatedInc = [newIncident, ...incidents];
+      setIncidents(updatedInc);
+      localStorage.setItem('stadium_os_demo_incidents', JSON.stringify(updatedInc));
+
+      // Reset form
       setAlertTitle('');
       setAlertDesc('');
       setAlertSeverity('medium');
       setAlertLocation('');
       setAlertTeam('');
       setIsAlertOpen(false);
+      
+      // Fetch latest
       fetchData();
+      showToast(`Emergency Alert Dispatched: ${alertTitle}`, 'warning');
     } catch (err) {
       console.error(err);
+      showToast('Failed to dispatch alert', 'warning');
     }
   };
 
@@ -196,6 +287,7 @@ export default function StaffDashboard() {
       setAccessLocation('');
       setIsAccessOpen(false);
       fetchData();
+      showToast('Accessibility support request logged.', 'success');
     } catch (err) {
       console.error(err);
     }
@@ -214,29 +306,83 @@ export default function StaffDashboard() {
       location: taskLocation
     };
 
-    setTasks(prev => [newTask, ...prev]);
+    const updatedTasks = [newTask, ...tasks];
+    setTasks(updatedTasks);
+    localStorage.setItem('stadium_os_demo_tasks', JSON.stringify(updatedTasks));
+
     setTaskTitle('');
     setTaskAssignee('');
     setTaskPriority('medium');
     setTaskLocation('');
     setIsTaskOpen(false);
+    showToast(`Task assigned to ${taskAssignee}.`, 'success');
   };
 
-  const handleResolveAlert = async (id: string) => {
+  const handleResolveAlert = async (id: string, title: string) => {
     try {
       await DatabaseService.resolveEmergencyAlert(id);
+      
+      // Update local incidents matching this alert if present
+      setIncidents(prev => prev.map(inc => inc.id === `inc-${id}` ? { ...inc, status: 'resolved' } : inc));
+      
       fetchData();
+      showToast(`Emergency Resolved: ${title}`, 'success');
     } catch (err) {
       console.error(err);
     }
   };
 
-  const toggleTaskStatus = (id: string) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: t.status === 'completed' ? 'pending' : 'completed' } : t));
+  const toggleTaskStatus = (id: string, title: string) => {
+    const updated = tasks.map(t => {
+      if (t.id === id) {
+        const newStatus = t.status === 'completed' ? 'pending' as const : 'completed' as const;
+        showToast(newStatus === 'completed' ? `Task Completed: ${title}` : `Task reopened: ${title}`, 'success');
+        return { ...t, status: newStatus };
+      }
+      return t;
+    });
+    setTasks(updated);
+    localStorage.setItem('stadium_os_demo_tasks', JSON.stringify(updated));
   };
 
-  const resolveIncident = (id: string) => {
-    setIncidents(prev => prev.map(inc => inc.id === id ? { ...inc, status: 'resolved' } : inc));
+  const resolveIncident = (id: string, title: string) => {
+    const updated = incidents.map(inc => inc.id === id ? { ...inc, status: 'resolved' as const } : inc);
+    setIncidents(updated);
+    localStorage.setItem('stadium_os_demo_incidents', JSON.stringify(updated));
+    showToast(`Incident Resolved: ${title}`, 'success');
+  };
+
+  const handleClaimTicket = async (id: string, type: string) => {
+    try {
+      await DatabaseService.updateAccessibilityStatus(id, 'in-progress', 'Operator assigned');
+      fetchData();
+      showToast(`Accessibility ticket claimed. Volunteer dispatched.`, 'success');
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleRefreshFeeds = () => {
+    setRefreshing(true);
+    fetchData().then(() => {
+      showToast('Live crowd metrics and camera feeds synced.', 'success');
+    });
+  };
+
+  const handleRefreshTransit = async () => {
+    setRefreshing(true);
+    try {
+      const trans = await DatabaseService.getTransportStatus();
+      const updated = trans.map(t => {
+        // Mock a schedule drift
+        const delta = Math.floor(Math.random() * 3) - 1;
+        return { ...t, etaMinutes: Math.max(1, t.etaMinutes + delta) };
+      });
+      localStorage.setItem('stadium_transport_status', JSON.stringify(updated));
+      setTransport(updated);
+      showToast('Transit telemetry schedule refreshed.', 'success');
+    } catch(e) {}
+    setRefreshing(false);
   };
 
   if (!mounted) return null;
@@ -248,7 +394,37 @@ export default function StaffDashboard() {
   ] : [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Toast Notification Container */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+        <AnimatePresence>
+          {toasts.map((toast) => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, y: 50, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className={`p-4 rounded-xl border shadow-2xl backdrop-blur-xl pointer-events-auto flex gap-2.5 items-start ${
+                toast.type === 'success'
+                  ? 'bg-emerald-950/75 border-emerald-500/30 text-emerald-200'
+                  : toast.type === 'warning'
+                  ? 'bg-rose-950/75 border-rose-500/30 text-rose-200'
+                  : 'bg-blue-950/75 border-blue-500/30 text-blue-200'
+              }`}
+            >
+              {toast.type === 'success' ? (
+                <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
+              ) : toast.type === 'warning' ? (
+                <AlertTriangle className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
+              ) : (
+                <Info className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
+              )}
+              <span className="text-xs font-semibold leading-normal">{toast.message}</span>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
       {/* Title / Action Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -259,9 +435,9 @@ export default function StaffDashboard() {
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={fetchData} 
+            onClick={handleRefreshFeeds} 
             disabled={refreshing}
-            className="text-xs flex gap-1.5 items-center border-slate-800 bg-[#0c101d]"
+            className="text-xs flex gap-1.5 items-center border-slate-800 bg-[#0c101d] cursor-pointer"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
             <span>Refresh feeds</span>
@@ -270,7 +446,7 @@ export default function StaffDashboard() {
             variant="outline" 
             size="sm"
             onClick={() => setIsTaskOpen(true)}
-            className="text-xs flex gap-1.5 items-center border-slate-800 bg-[#0c101d] text-cyan-400 hover:text-cyan-300"
+            className="text-xs flex gap-1.5 items-center border-slate-800 bg-[#0c101d] text-cyan-400 hover:text-cyan-300 cursor-pointer"
           >
             <PlusCircle className="h-3.5 w-3.5" />
             <span>Assign Task</span>
@@ -279,7 +455,7 @@ export default function StaffDashboard() {
             variant="destructive" 
             size="sm" 
             onClick={() => setIsAlertOpen(true)}
-            className="text-xs flex gap-1.5 items-center bg-rose-700 hover:bg-rose-800"
+            className="text-xs flex gap-1.5 items-center bg-rose-700 hover:bg-rose-800 cursor-pointer"
           >
             <ShieldAlert className="h-4 w-4" />
             <span>Dispatch Emergency</span>
@@ -287,14 +463,12 @@ export default function StaffDashboard() {
         </div>
       </div>
 
-      {/* ----------------------------------------------------
-          TOP STATS ROW
-          ---------------------------------------------------- */}
+      {/* STATS ROW */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Visitors */}
-        <Card className="relative overflow-hidden bg-[#080d19]/45 border-slate-900/60">
+        <Card className="bg-[#080d19]/45 border-slate-900/60">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Active Footprint</CardTitle>
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400 font-mono">Active Footprint</CardTitle>
             <Users className="h-4 w-4 text-blue-400" />
           </CardHeader>
           <CardContent>
@@ -308,9 +482,9 @@ export default function StaffDashboard() {
         </Card>
 
         {/* Emergency Alerts */}
-        <Card className="relative overflow-hidden bg-[#080d19]/45 border-slate-900/60">
+        <Card className="bg-[#080d19]/45 border-slate-900/60">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Emergency Dispatches</CardTitle>
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400 font-mono">Emergency Dispatches</CardTitle>
             <ShieldAlert className="h-4 w-4 text-rose-500" />
           </CardHeader>
           <CardContent>
@@ -328,9 +502,9 @@ export default function StaffDashboard() {
         </Card>
 
         {/* Pending Operations Tasks */}
-        <Card className="relative overflow-hidden bg-[#080d19]/45 border-slate-900/60">
+        <Card className="bg-[#080d19]/45 border-slate-900/60">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Pending Staff Tasks</CardTitle>
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400 font-mono">Pending Staff Tasks</CardTitle>
             <ClipboardList className="h-4 w-4 text-cyan-400" />
           </CardHeader>
           <CardContent>
@@ -344,9 +518,9 @@ export default function StaffDashboard() {
         </Card>
 
         {/* Active Volunteers */}
-        <Card className="relative overflow-hidden bg-[#080d19]/45 border-slate-900/60">
+        <Card className="bg-[#080d19]/45 border-slate-900/60">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Volunteers On Duty</CardTitle>
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400 font-mono">Volunteers On Duty</CardTitle>
             <UserCheck className="h-4 w-4 text-emerald-400" />
           </CardHeader>
           <CardContent>
@@ -367,7 +541,7 @@ export default function StaffDashboard() {
         {/* Crowd Density Chart */}
         <Card className="md:col-span-2 bg-[#080d19]/45 border-slate-900/60">
           <CardHeader>
-            <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+            <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-white">
               <Activity className="h-4 w-4 text-cyan-400" />
               Real-Time Crowd Density distribution
             </CardTitle>
@@ -401,7 +575,7 @@ export default function StaffDashboard() {
         {/* Visitor Distribution Chart */}
         <Card className="bg-[#080d19]/45 border-slate-900/60">
           <CardHeader>
-            <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+            <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-white">
               <Users className="h-4 w-4 text-blue-400" />
               Visitor Allocation Split
             </CardTitle>
@@ -430,7 +604,6 @@ export default function StaffDashboard() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                {/* Custom Legend */}
                 <div className="flex justify-around text-xs border-t border-slate-900/60 pt-4">
                   {visitorChartData.map((item, idx) => (
                     <div key={idx} className="flex flex-col items-center">
@@ -454,7 +627,7 @@ export default function StaffDashboard() {
         <Card className="flex flex-col h-[380px] bg-[#080d19]/45 border-slate-900/60">
           <CardHeader className="pb-3 flex flex-row justify-between items-center space-y-0">
             <div>
-              <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-red-400">
+              <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-rose-400">
                 <ShieldAlert className="h-4 w-4" />
                 Emergency Operations
               </CardTitle>
@@ -486,8 +659,8 @@ export default function StaffDashboard() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleResolveAlert(alert.id)}
-                        className="h-6 text-[10px] py-0 border-emerald-900/40 text-emerald-400 bg-emerald-950/10 hover:bg-emerald-950/30 hover:border-emerald-500/40"
+                        onClick={() => handleResolveAlert(alert.id, alert.title)}
+                        className="h-6 text-[10px] py-0 border-emerald-900/40 text-emerald-400 bg-emerald-950/10 hover:bg-emerald-950/30 hover:border-emerald-500/40 cursor-pointer"
                       >
                         Resolve Dispatch
                       </Button>
@@ -516,8 +689,8 @@ export default function StaffDashboard() {
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
                     <button 
-                      onClick={() => toggleTaskStatus(task.id)}
-                      className={`h-4.5 w-4.5 rounded border transition-colors flex items-center justify-center shrink-0 ${
+                      onClick={() => toggleTaskStatus(task.id, task.title)}
+                      className={`h-4.5 w-4.5 rounded border transition-colors flex items-center justify-center shrink-0 cursor-pointer ${
                         task.status === 'completed' 
                           ? 'bg-emerald-600 border-emerald-500 text-white' 
                           : 'border-slate-700 bg-slate-900/60 text-transparent hover:border-cyan-500/60'
@@ -569,8 +742,8 @@ export default function StaffDashboard() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => resolveIncident(inc.id)}
-                      className="h-6 text-[9px] px-2 text-emerald-400 hover:bg-emerald-950/20"
+                      onClick={() => resolveIncident(inc.id, inc.issue)}
+                      className="h-6 text-[9px] px-2 text-emerald-400 hover:bg-emerald-950/20 cursor-pointer"
                     >
                       Mark Resolved
                     </Button>
@@ -586,12 +759,22 @@ export default function StaffDashboard() {
       <div className="grid gap-6 md:grid-cols-2">
         {/* Transit Operations */}
         <Card className="flex flex-col h-[300px] bg-[#080d19]/45 border-slate-900/60">
-          <CardHeader className="pb-3 border-b border-slate-900/30">
-            <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-blue-400">
-              <Bus className="h-4 w-4" />
-              Transit Operations Feed
-            </CardTitle>
-            <CardDescription className="text-xs">Metro, Shuttles, and regional rail status</CardDescription>
+          <CardHeader className="pb-3 flex flex-row justify-between items-center space-y-0">
+            <div>
+              <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-blue-400">
+                <Bus className="h-4 w-4" />
+                Transit Operations Feed
+              </CardTitle>
+              <CardDescription className="text-xs">Metro, Shuttles, and regional rail status</CardDescription>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRefreshTransit}
+              className="h-7 text-[10px] px-2.5 flex items-center border-slate-800 bg-[#0c101d] text-cyan-400 hover:text-cyan-300 cursor-pointer"
+            >
+              <RefreshCw className="mr-1 h-3 w-3" /> Refresh Schedule
+            </Button>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
             {loading ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />) : (
@@ -623,7 +806,7 @@ export default function StaffDashboard() {
             <div>
               <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-cyan-400">
                 <Accessibility className="h-4 w-4" />
-                Accessibility Assistance Desk
+                Accessibility Desk
               </CardTitle>
               <CardDescription className="text-xs">Support requests and companion routing</CardDescription>
             </div>
@@ -631,7 +814,7 @@ export default function StaffDashboard() {
               variant="outline" 
               size="sm" 
               onClick={() => setIsAccessOpen(true)}
-              className="h-7 text-[10px] px-2.5 flex items-center border-slate-800 bg-[#0c101d] text-cyan-400 hover:text-cyan-300"
+              className="h-7 text-[10px] px-2.5 flex items-center border-slate-800 bg-[#0c101d] text-cyan-400 hover:text-cyan-300 cursor-pointer"
             >
               <PlusCircle className="mr-1 h-3 w-3" /> Add Request
             </Button>
@@ -654,21 +837,23 @@ export default function StaffDashboard() {
                     <p>Location: <span className="text-slate-200">{req.location}</span></p>
                     <p>Email: <span className="text-slate-300">{req.userEmail}</span></p>
                   </div>
-                  {!req.assignedStaff && (
+                  {req.status === 'pending' ? (
                     <div className="flex justify-end pt-1">
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={async () => {
-                          await DatabaseService.updateAccessibilityStatus(req.id, 'in-progress', 'Operations Desk');
-                          fetchData();
-                        }}
-                        className="h-6 text-[9px] px-2 text-cyan-400 hover:bg-cyan-950/20"
+                        onClick={() => handleClaimTicket(req.id, req.requestType)}
+                        className="h-6 text-[9px] px-2 text-cyan-400 hover:bg-cyan-950/20 cursor-pointer"
                       >
                         Claim Ticket
                       </Button>
                     </div>
-                  )}
+                  ) : req.assignedStaff ? (
+                    <div className="flex items-center gap-1 text-[9px] text-slate-500 border-t border-slate-900/60 pt-1.5 font-mono">
+                      <Clock className="h-3 w-3" />
+                      <span>Assigned: {req.assignedStaff}</span>
+                    </div>
+                  ) : null}
                 </div>
               ))
             )}
@@ -731,7 +916,7 @@ export default function StaffDashboard() {
                 onChange={e => setAlertLocation(e.target.value)} 
                 className="mt-1"
                 required 
-            />
+              />
             </div>
           </div>
           <div>

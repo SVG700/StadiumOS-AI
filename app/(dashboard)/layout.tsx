@@ -36,12 +36,11 @@ interface SidebarItem {
 
 const VISITOR_ITEMS: SidebarItem[] = [
   { name: 'Dashboard', href: '/dashboard/visitor', icon: Home },
-  { name: 'Ticket Info', href: '/dashboard/visitor#ticket', icon: Ticket },
   { name: 'Smart Navigation', href: '/navigation', icon: Map },
   { name: 'Transportation', href: '/transport', icon: Bus },
   { name: 'AI Assistant', href: '/assistant', icon: Bot },
   { name: 'Accessibility', href: '/accessibility', icon: Accessibility },
-  { name: 'Sustainability', href: '/sustainability', icon: Leaf },
+  { name: 'Green Stadium', href: '/sustainability', icon: Leaf },
 ];
 
 const STAFF_ITEMS: SidebarItem[] = [

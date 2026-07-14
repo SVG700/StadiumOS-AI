@@ -158,7 +158,7 @@ export default function SettingsPage() {
                   {process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your-gemini-api-key' ? (
                     <Badge variant="success">Active Connection</Badge>
                   ) : (
-                    <Badge variant="warning">Simulated Sandbox</Badge>
+                    <Badge variant="warning">Local Simulation Mode</Badge>
                   )}
                 </div>
               </div>
