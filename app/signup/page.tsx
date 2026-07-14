@@ -1,0 +1,196 @@
+'use client';
+
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { UserProfile } from '@/types';
+import { Shield, Info } from 'lucide-react';
+
+const ROLE_OPTIONS = [
+  { value: 'visitor', label: 'Visitor / Fan (Visitor Portal)' },
+  { value: 'staff', label: 'Stadium Operations Staff' },
+  { value: 'fifa', label: 'FIFA Board Member (FIFA Executive)' },
+  { value: 'organizer', label: 'Stadium Organizer / Coordinator' },
+  { value: 'security', label: 'Security & Safety Patrol' },
+  { value: 'medical', label: 'Emergency Medical Staff' },
+  { value: 'volunteer', label: 'Volunteer Force' },
+  { value: 'accessibility', label: 'Accessibility Support Agent' },
+  { value: 'transport', label: 'Transportation & Logistics' },
+  { value: 'sustainability', label: 'Sustainability Audit Team' },
+  { value: 'fan', label: 'Spectator / Fan' },
+];
+
+export default function SignupPage() {
+  const { signUp, isDemoMode } = useAuth();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState<UserProfile['role']>('organizer');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || !email || !password || !role) {
+      setError('Please fill in all fields.');
+      return;
+    }
+
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const result = await signUp(email, password, name, role);
+      if (result.success) {
+        setSuccess(true);
+      } else {
+        setError(result.error || 'Account request failed.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#05070c] px-4 py-8">
+      {/* Background glowing rings */}
+      <div className="absolute top-1/4 left-1/4 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-950/20 blur-[120px]" />
+      <div className="absolute bottom-1/4 right-1/4 h-[500px] w-[500px] translate-x-1/2 translate-y-1/2 rounded-full bg-cyan-950/20 blur-[120px]" />
+
+      <div className="relative w-full max-w-md">
+        {/* Brand Logo */}
+        <div className="mb-6 flex flex-col items-center justify-center text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 shadow-lg">
+            <Shield className="h-6 w-6 text-white" />
+          </div>
+          <h1 className="mt-3 text-2xl font-bold text-white">
+            StadiumOS <span className="text-cyan-400">AI</span>
+          </h1>
+          <p className="text-xs text-slate-400">FIFA World Cup 2026 Operations Console</p>
+        </div>
+
+        {/* Signup Card */}
+        <div className="rounded-2xl border border-blue-950/50 bg-[#0d121f]/70 p-8 shadow-2xl backdrop-blur-md">
+          {success ? (
+            <div className="text-center space-y-4">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h2 className="text-lg font-bold text-slate-100">Registration Complete</h2>
+              {isDemoMode ? (
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  In Demo Mode, your account is simulated and auto-authorized. You are now logged in and being redirected...
+                </p>
+              ) : (
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  An email verification link has been sent to your address. Please verify your email to log in to the system.
+                </p>
+              )}
+              <div className="pt-2">
+                <Link href="/login">
+                  <Button className="w-full">Proceed to Sign In</Button>
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <>
+              <h2 className="text-xl font-bold text-slate-100">Request Operations Account</h2>
+              <p className="mt-1 text-xs text-slate-400">Register credentials for stadium clearance.</p>
+
+              <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+                <div>
+                  <label htmlFor="name" className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
+                    Full Name
+                  </label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="Jane Doe"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="mt-1.5"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="email" className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
+                    Email Address
+                  </label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="name@stadiumos.ai"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="mt-1.5"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="role" className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
+                    Operational Assignment (Role)
+                  </label>
+                  <Select
+                    id="role"
+                    options={ROLE_OPTIONS}
+                    value={role}
+                    onChange={(e) => setRole(e.target.value as UserProfile['role'])}
+                    className="mt-1.5"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="password" className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
+                    Secret Passcode
+                  </label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="mt-1.5"
+                    required
+                    minLength={6}
+                  />
+                </div>
+
+                {error && (
+                  <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-400 flex gap-2 items-start">
+                    <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span>{error}</span>
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  className="w-full mt-2"
+                  isLoading={isLoading}
+                >
+                  Generate Credentials
+                </Button>
+              </form>
+
+              <div className="mt-6 text-center text-xs text-slate-400">
+                Already registered?{' '}
+                <Link href="/login" className="font-semibold text-cyan-400 hover:text-cyan-300 hover:underline">
+                  Sign In
+                </Link>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </main>
+  );
+}
