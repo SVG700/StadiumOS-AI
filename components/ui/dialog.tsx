@@ -18,7 +18,9 @@ export function Dialog({ isOpen, onClose, title, description, children }: Dialog
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
-    setMounted(true);
+    setTimeout(() => {
+      setMounted(true);
+    }, 0);
     
     // Close on ESC key press
     const handleKeyDown = (e: KeyboardEvent) => {
