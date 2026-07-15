@@ -583,12 +583,100 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const savedNotifs = getL('stadium_notifications', INITIAL_NOTIFICATIONS);
       const savedHistory = getL('stadium_ops_history', []);
 
+      // Sanitize stadium list items (incidents, tasks, alerts)
+      const sanitizedStadiums = savedStadiums.map(stadium => {
+        const seenIncidentIds = new Set<string>();
+        const seenTaskIds = new Set<string>();
+        const seenAlertIds = new Set<string>();
+
+        const incidents = (stadium.simulatedIncidents || []).map(inc => {
+          const isOld = inc.id.match(/^sim-inc-\d+$/);
+          if (isOld || seenIncidentIds.has(inc.id)) {
+            const newId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+              ? `sim-inc-${crypto.randomUUID()}`
+              : `sim-inc-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+            seenIncidentIds.add(newId);
+            return { ...inc, id: newId };
+          }
+          seenIncidentIds.add(inc.id);
+          return inc;
+        });
+
+        const tasks = (stadium.tasks || []).map(task => {
+          const isOld = task.id.match(/^task-\d+$/);
+          if (isOld || seenTaskIds.has(task.id)) {
+            const newId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+              ? `task-${crypto.randomUUID()}`
+              : `task-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+            seenTaskIds.add(newId);
+            return { ...task, id: newId };
+          }
+          seenTaskIds.add(task.id);
+          return task;
+        });
+
+        const alerts = (stadium.alerts || []).map(alert => {
+          const isOld = alert.id.match(/^alert-\d+$/);
+          if (isOld || seenAlertIds.has(alert.id)) {
+            const newId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+              ? `alert-${crypto.randomUUID()}`
+              : `alert-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+            seenAlertIds.add(newId);
+            return { ...alert, id: newId };
+          }
+          seenAlertIds.add(alert.id);
+          return alert;
+        });
+
+        return {
+          ...stadium,
+          simulatedIncidents: incidents,
+          tasks,
+          alerts
+        };
+      });
+
+      // Sanitize notifications
+      const seenNotifIds = new Set<string>();
+      const sanitizedNotifs = savedNotifs.map(n => {
+        const isOldFormat = n.id.match(/^not-\d+$/);
+        if (isOldFormat || seenNotifIds.has(n.id)) {
+          const newId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? `not-${crypto.randomUUID()}`
+            : `not-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+          seenNotifIds.add(newId);
+          return { ...n, id: newId };
+        }
+        seenNotifIds.add(n.id);
+        return n;
+      });
+
+      // Sanitize history
+      const seenHistoryIds = new Set<string>();
+      const sanitizedHistory = savedHistory.map(h => {
+        const isOldFormat = h.id.match(/^hist-\d+$/);
+        if (isOldFormat || seenHistoryIds.has(h.id)) {
+          const newId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? `hist-${crypto.randomUUID()}`
+            : `hist-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+          seenHistoryIds.add(newId);
+          return { ...h, id: newId };
+        }
+        seenHistoryIds.add(h.id);
+        return h;
+      });
+
+      // Write sanitized states back to localStorage
+      localStorage.setItem('stadium_multi_list', JSON.stringify(sanitizedStadiums));
+      localStorage.setItem('stadium_notifications', JSON.stringify(sanitizedNotifs));
+      localStorage.setItem('stadium_ops_history', JSON.stringify(sanitizedHistory));
+
       setTimeout(() => {
-        setStadiums(savedStadiums);
+        setStadiums(sanitizedStadiums);
         setSelectedStadiumId(savedSelectedId);
         setTimeline(savedTimeline);
-        setNotifications(savedNotifs);
-        setHistory(savedHistory);
+        setNotifications(sanitizedNotifs);
+        setHistory(sanitizedHistory);
       }, 0);
     }
   }, []);
