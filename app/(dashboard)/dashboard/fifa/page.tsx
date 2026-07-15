@@ -9,38 +9,8 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { useStadium, MatchPhase, AfterActionReport } from '@/components/stadium/StadiumContext';
 import { AnimatePresence } from 'framer-motion';
 import { AnimatedNumber } from '@/components/stadium/AnimatedNumber';
-import dynamic from 'next/dynamic';
-
-const ResponsiveContainer = dynamic(
-  () => import('recharts').then((m) => m.ResponsiveContainer),
-  { ssr: false }
-);
-const AreaChart = dynamic(
-  () => import('recharts').then((m) => m.AreaChart),
-  { ssr: false }
-);
-const Area = dynamic(
-  () => import('recharts').then((m) => m.Area),
-  { ssr: false }
-);
-const XAxis = dynamic(
-  () => import('recharts').then((m) => m.XAxis),
-  { ssr: false }
-);
-const YAxis = dynamic(
-  () => import('recharts').then((m) => m.YAxis),
-  { ssr: false }
-);
-const Tooltip = dynamic(
-  () => import('recharts').then((m) => m.Tooltip),
-  { ssr: false }
-);
-const Legend = dynamic(
-  () => import('recharts').then((m) => m.Legend),
-  { ssr: false }
-);
 import { 
-  Globe, AlertTriangle, Trophy, ShieldAlert, FlameKindling, Sun, 
+  Globe, AlertTriangle, Trophy, ShieldAlert, 
   Activity, Clock, FileText, Printer
 } from 'lucide-react';
 
@@ -54,9 +24,7 @@ export default function FifaDashboard() {
     timeline,
     changeMatchPhase,
     executePlaybook,
-    triggerRandomIncident,
-    resilienceScore,
-    fanExperienceScore
+    triggerRandomIncident
   } = useStadium();
 
   // Dialog state for After Action Reports
@@ -77,12 +45,6 @@ export default function FifaDashboard() {
     globalViewers: parseFloat(stadiums.reduce((sum, s) => sum + s.match.broadcastViewers, 0).toFixed(1))
   };
 
-  // Weather indicator formatter
-  const getWeatherIcon = (prob: number) => {
-    if (prob > 50) return <FlameKindling className="h-5 w-5 text-blue-400 animate-bounce" />;
-    return <Sun className="h-5 w-5 text-amber-400 animate-spin" style={{ animationDuration: '8s' }} />;
-  };
-
   // Health Score Style helper
   const getHealthBadge = (health: string) => {
     switch (health) {
@@ -98,20 +60,15 @@ export default function FifaDashboard() {
     }
   };
 
-  // Recharts Visit Trends Mock Data
-  const chartData = [
-    { name: '12:00', Vancouver: 12000, LA: 8000, Dallas: 15000, NY: 20000 },
-    { name: '14:00', Vancouver: 28000, LA: 19000, Dallas: 34000, NY: 42000 },
-    { name: '16:00', Vancouver: 54000, LA: 45000, Dallas: 68000, NY: 72000 },
-    { name: '18:00', Vancouver: 68420, LA: 72100, Dallas: 88200, NY: 80200 },
-    { name: '20:00', Vancouver: 68420, LA: 72100, Dallas: 88200, NY: 80200 },
-  ];
-
   // Filtered Decision Timeline
   const filteredTimeline = timeline.filter(item => {
     if (timelineFilter === 'all') return true;
     return item.type === timelineFilter;
   });
+
+  const [showAllTimeline, setShowAllTimeline] = useState(false);
+
+  const visibleTimeline = showAllTimeline ? filteredTimeline : filteredTimeline.slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -202,8 +159,8 @@ export default function FifaDashboard() {
             </CardTitle>
             <CardDescription className="text-xs">Select any stadium to inspect real-time logs.</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 flex items-center justify-center p-6 min-h-[300px]">
-            <div className="relative w-full aspect-[2/1] bg-slate-950/60 rounded-2xl border border-slate-900 overflow-hidden">
+          <CardContent className="flex-1 flex items-center justify-center p-6 min-h-[195px]">
+            <div className="relative w-full aspect-[3/1] bg-slate-950/60 rounded-2xl border border-slate-900 overflow-hidden">
               <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#334155_1.5px,transparent_1px)] [background-size:16px_16px]" />
               
               <svg className="absolute inset-0 w-full h-full text-slate-800" fill="none" viewBox="0 0 800 400">
@@ -237,192 +194,87 @@ export default function FifaDashboard() {
           </CardContent>
         </Card>
 
-        {/* Command Controls (Resilience & Playbooks) */}
+        {/* Command Controls (Playbooks Only - Compact) */}
         <Card className="bg-[#080d19]/45 border-slate-900/60 overflow-hidden flex flex-col justify-between">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-white">
               <Activity className="h-4.5 w-4.5 text-cyan-400" />
-              Command Center Portal
+              Emergency Playbooks
             </CardTitle>
-            <CardDescription className="text-xs">Dynamic gauges and fast emergency response loops.</CardDescription>
+            <CardDescription className="text-xs">Fast emergency response loops.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4 flex-1 flex flex-col justify-between">
-            
-            {/* Resilience Score & Fan Experience Index Gauges */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3.5 rounded-xl border border-slate-900 bg-slate-950/40 text-center relative overflow-hidden">
-                <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block font-mono mb-1">
-                  Resilience Score
-                </span>
-                <span className="text-3xl font-black text-cyan-400 block font-mono">
-                  <AnimatedNumber value={resilienceScore} />
-                </span>
-                <span className="text-[8px] text-slate-400 block mt-1">AI Stability Index</span>
-              </div>
-              <div className="p-3.5 rounded-xl border border-slate-900 bg-slate-950/40 text-center relative overflow-hidden">
-                <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block font-mono mb-1">
-                  Fan Experience
-                </span>
-                <span className={`text-xl font-black block uppercase tracking-widest mt-1 ${
-                  fanExperienceScore === 'Excellent' ? 'text-emerald-400' :
-                  fanExperienceScore === 'Good' ? 'text-cyan-400' :
-                  fanExperienceScore === 'Fair' ? 'text-amber-400' : 'text-rose-500'
-                }`}>
-                  {fanExperienceScore}
-                </span>
-                <span className="text-[8px] text-slate-400 block mt-2">Live Satisfaction Index</span>
-              </div>
+          <CardContent className="space-y-3 pt-0 flex-1 flex flex-col justify-center">
+            <div className="grid grid-cols-2 gap-2 w-full">
+              {[
+                { id: 'gate-congestion', label: 'Gate Congestion', color: 'bg-amber-900/20 hover:bg-amber-950/30 border-amber-900/40 text-amber-300' },
+                { id: 'medical-surge', label: 'Medical Surge', color: 'bg-rose-900/20 hover:bg-rose-950/30 border-rose-900/40 text-rose-300' },
+                { id: 'heavy-rain', label: 'Heavy Rain', color: 'bg-cyan-900/20 hover:bg-cyan-950/30 border-cyan-900/40 text-cyan-300' },
+                { id: 'power-failure', label: 'Power Failure', color: 'bg-red-900/20 hover:bg-red-950/30 border-red-900/40 text-red-300' }
+              ].map((play) => (
+                <Button
+                  key={play.id}
+                  variant="outline"
+                  onClick={() => executePlaybook(play.id)}
+                  className={`text-[10px] py-1.5 h-8.5 font-bold border rounded-lg cursor-pointer ${play.color}`}
+                >
+                  {play.label}
+                </Button>
+              ))}
             </div>
-
-            {/* Interactive Playbook Launcher */}
-            <div className="space-y-2 border-t border-slate-900/60 pt-3 flex-1 flex flex-col justify-end">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block font-mono mb-1">
-                🚒 Dispatch Emergency Playbooks
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 'gate-congestion', label: 'Gate Congestion', color: 'bg-amber-900/20 hover:bg-amber-950/30 border-amber-900/40 text-amber-300' },
-                  { id: 'medical-surge', label: 'Medical Surge', color: 'bg-rose-900/20 hover:bg-rose-950/30 border-rose-900/40 text-rose-300' },
-                  { id: 'heavy-rain', label: 'Heavy Rain', color: 'bg-cyan-900/20 hover:bg-cyan-950/30 border-cyan-900/40 text-cyan-300' },
-                  { id: 'power-failure', label: 'Power Failure', color: 'bg-red-900/20 hover:bg-red-950/30 border-red-900/40 text-red-300' }
-                ].map((play) => (
-                  <Button
-                    key={play.id}
-                    variant="outline"
-                    onClick={() => executePlaybook(play.id)}
-                    className={`text-[10px] py-1.5 h-8.5 font-bold border rounded-lg cursor-pointer ${play.color}`}
-                  >
-                    {play.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
           </CardContent>
         </Card>
       </div>
 
       {/* ----------------------------------------------------
-          3. MATCH OPERATIONS CENTER & WEATHER INTEL
+          3. MATCH OPERATIONS CENTER (Compact Full-Width Banner)
           ---------------------------------------------------- */}
-      <div className="grid gap-6 md:grid-cols-2">
-        
-        {/* Match Details Operations panel */}
-        <Card className="bg-[#080d19]/45 border-slate-900/60 overflow-hidden flex flex-col justify-between">
-          <CardHeader className="pb-3 border-b border-slate-900/30">
-            <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-white">
-              <Trophy className="h-4.5 w-4.5 text-amber-400" />
-              Match Operations Center: {selectedStadium.city}
-            </CardTitle>
-            <CardDescription className="text-xs">Active fixture schedules and live stadium telemetries.</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-4 space-y-4">
-            <div className="flex justify-between items-center text-center p-3.5 rounded-xl border border-slate-900 bg-slate-950/50">
-              <div className="flex-1">
-                <span className="text-lg font-black block text-white">{selectedStadium.match.teamA}</span>
-              </div>
-              <div className="px-3 shrink-0">
-                <span className="text-[8px] font-mono font-bold text-amber-400 block mb-0.5">STAGE</span>
-                <Badge variant="warning" className="text-[9px] uppercase tracking-wider font-mono">
-                  {selectedStadium.match.stage}
-                </Badge>
-              </div>
-              <div className="flex-1">
-                <span className="text-lg font-black block text-white">{selectedStadium.match.teamB}</span>
-              </div>
-            </div>
+      <Card className="bg-[#080d19]/45 border-slate-900/60 overflow-hidden">
+        <CardContent className="p-4 flex flex-col lg:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 shrink-0">
+            <Trophy className="h-4.5 w-4.5 text-amber-400" />
+            <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">Match Ops: {selectedStadium.city}</span>
+          </div>
+          
+          <div className="flex items-center justify-between text-center py-1 px-3 rounded-lg border border-slate-900 bg-slate-950/50 gap-4 shrink-0">
+            <span className="text-xs font-black text-white">{selectedStadium.match.teamA}</span>
+            <Badge variant="warning" className="text-[8px] uppercase tracking-wider font-mono py-0">{selectedStadium.match.stage}</Badge>
+            <span className="text-xs font-black text-white">{selectedStadium.match.teamB}</span>
+          </div>
 
-            <div className="grid grid-cols-3 gap-3 text-center text-xs">
-              <div className="p-3 rounded-lg border border-slate-900 bg-slate-950/30">
-                <span className="text-slate-500 block text-[9px] uppercase font-mono tracking-wider mb-0.5">Kickoff</span>
-                <span className="text-white font-bold">{selectedStadium.match.kickoff}</span>
-              </div>
-              <div className="p-3 rounded-lg border border-slate-900 bg-slate-950/30">
-                <span className="text-slate-500 block text-[9px] uppercase font-mono tracking-wider mb-0.5">Attendance</span>
-                <span className="text-white font-bold"><AnimatedNumber value={selectedStadium.match.attendance} /></span>
-              </div>
-              <div className="p-3 rounded-lg border border-slate-900 bg-slate-950/30">
-                <span className="text-slate-500 block text-[9px] uppercase font-mono tracking-wider mb-0.5">VAR Room</span>
-                <Badge variant={selectedStadium.match.varStatus === 'Online' ? 'success' : 'warning'} className="text-[9px] py-0 font-mono mt-0.5">
-                  {selectedStadium.match.varStatus}
-                </Badge>
-              </div>
-              <div className="p-3 rounded-lg border border-slate-900 bg-slate-950/30">
-                <span className="text-slate-500 block text-[9px] uppercase font-mono tracking-wider mb-0.5">Security Clearance</span>
-                <Badge variant={selectedStadium.match.securityLevel === 'Normal' ? 'success' : 'warning'} className="text-[9px] py-0 font-mono mt-0.5">
-                  {selectedStadium.match.securityLevel}
-                </Badge>
-              </div>
-              <div className="p-3 rounded-lg border border-slate-900 bg-slate-950/30">
-                <span className="text-slate-500 block text-[9px] uppercase font-mono tracking-wider mb-0.5">Medical Readiness</span>
-                <Badge variant={selectedStadium.match.medicalStatus === 'Ready' ? 'success' : 'warning'} className="text-[9px] py-0 font-mono mt-0.5">
-                  {selectedStadium.match.medicalStatus}
-                </Badge>
-              </div>
-              <div className="p-3 rounded-lg border border-slate-900 bg-slate-950/30">
-                <span className="text-slate-500 block text-[9px] uppercase font-mono tracking-wider mb-0.5">Global Viewers</span>
-                <span className="text-white font-bold"><AnimatedNumber value={selectedStadium.match.broadcastViewers} duration={500} formatter={v => v.toFixed(1)} />M</span>
-              </div>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center text-xs flex-1 w-full lg:w-auto">
+            <div className="p-1.5 rounded border border-slate-900 bg-slate-950/30">
+              <span className="text-slate-500 block text-[8px] font-mono">Kickoff</span>
+              <span className="text-white font-bold text-[10px]">{selectedStadium.match.kickoff}</span>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Live Weather Card */}
-        <Card className="bg-[#080d19]/45 border-slate-900/60 overflow-hidden flex flex-col justify-between">
-          <CardHeader className="pb-3 border-b border-slate-900/30">
-            <CardTitle className="text-sm font-semibold flex items-center justify-between text-white">
-              <span className="flex items-center gap-1.5">
-                <Sun className="h-4.5 w-4.5 text-amber-400" />
-                Live Climate Intelligence: {selectedStadium.city}
-              </span>
-              {getWeatherIcon(selectedStadium.weather.rainProb)}
-            </CardTitle>
-            <CardDescription className="text-xs">Atmospheric parameters driving local water & shade dispatches.</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-4 space-y-4">
-            <div className="flex justify-between items-center text-center p-3.5 rounded-xl border border-slate-900 bg-slate-950/50">
-              <div className="flex-1">
-                <span className="text-2xl font-black text-white"><AnimatedNumber value={selectedStadium.weather.temp} />°C</span>
-                <span className="text-[9px] text-slate-500 block font-mono mt-0.5">TEMPERATURE</span>
-              </div>
-              <div className="w-px h-10 bg-slate-800" />
-              <div className="flex-1">
-                <span className="text-xl font-bold text-amber-400 block font-mono">{selectedStadium.weather.uv} / 10</span>
-                <span className="text-[9px] text-slate-500 block font-mono mt-0.5">UV INDEX</span>
-              </div>
+            <div className="p-1.5 rounded border border-slate-900 bg-slate-950/30">
+              <span className="text-slate-500 block text-[8px] font-mono">Attendance</span>
+              <span className="text-white font-bold text-[10px]"><AnimatedNumber value={selectedStadium.match.attendance} /></span>
             </div>
-
-            <div className="grid grid-cols-4 gap-2 text-center text-xs">
-              <div className="p-2 rounded border border-slate-900 bg-slate-950/30">
-                <span className="text-slate-500 block text-[8px] font-mono">Humidity</span>
-                <span className="text-white font-bold">{selectedStadium.weather.humidity}%</span>
-              </div>
-              <div className="p-2 rounded border border-slate-900 bg-slate-950/30">
-                <span className="text-slate-500 block text-[8px] font-mono">Wind</span>
-                <span className="text-white font-bold">{selectedStadium.weather.wind} km/h</span>
-              </div>
-              <div className="p-2 rounded border border-slate-900 bg-slate-950/30">
-                <span className="text-slate-500 block text-[8px] font-mono">Precip.</span>
-                <span className="text-white font-bold">{selectedStadium.weather.rainProb}%</span>
-              </div>
-              <div className="p-2 rounded border border-slate-900 bg-slate-950/30">
-                <span className="text-slate-500 block text-[8px] font-mono">AQI</span>
-                <span className="text-white font-bold">{selectedStadium.weather.aqi}</span>
-              </div>
+            <div className="p-1.5 rounded border border-slate-900 bg-slate-950/30">
+              <span className="text-slate-500 block text-[8px] font-mono">VAR Room</span>
+              <Badge variant={selectedStadium.match.varStatus === 'Online' ? 'success' : 'warning'} className="text-[8px] py-0 font-mono mt-0.5">
+                {selectedStadium.match.varStatus}
+              </Badge>
             </div>
-
-            {selectedStadium.weather.temp >= 30 && (
-              <div className="flex items-start gap-2.5 p-3 rounded-lg border border-rose-900/30 bg-rose-950/10 text-xs">
-                <AlertTriangle className="h-4.5 w-4.5 text-rose-500 shrink-0 mt-0.5 animate-pulse" />
-                <div className="space-y-1 text-slate-300">
-                  <span className="font-bold text-rose-400 block">AI Heat Mitigation Alert</span>
-                  <span>Spectator Heat Index exceeds 30°C. Hydration advisors triggered in fans app section.</span>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            <div className="p-1.5 rounded border border-slate-900 bg-slate-950/30">
+              <span className="text-slate-500 block text-[8px] font-mono">Security</span>
+              <Badge variant={selectedStadium.match.securityLevel === 'Normal' ? 'success' : 'warning'} className="text-[8px] py-0 font-mono mt-0.5">
+                {selectedStadium.match.securityLevel}
+              </Badge>
+            </div>
+            <div className="p-1.5 rounded border border-slate-900 bg-slate-950/30">
+              <span className="text-slate-500 block text-[8px] font-mono">Medical</span>
+              <Badge variant={selectedStadium.match.medicalStatus === 'Ready' ? 'success' : 'warning'} className="text-[8px] py-0 font-mono mt-0.5">
+                {selectedStadium.match.medicalStatus}
+              </Badge>
+            </div>
+            <div className="p-1.5 rounded border border-slate-900 bg-slate-950/30">
+              <span className="text-slate-500 block text-[8px] font-mono">Viewers</span>
+              <span className="text-white font-bold text-[10px]"><AnimatedNumber value={selectedStadium.match.broadcastViewers} duration={500} formatter={v => v.toFixed(1)} />M</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ----------------------------------------------------
           4. SIMULATED INCIDENT LIFECYCLE & AAR REPORTS
@@ -535,10 +387,10 @@ export default function FifaDashboard() {
             </div>
 
             <div className="space-y-3.5 flex-1 overflow-y-auto max-h-60 pr-1 text-xs">
-              {filteredTimeline.length === 0 ? (
+              {visibleTimeline.length === 0 ? (
                 <div className="text-center py-12 text-slate-600 text-xs">No matching logs in scope.</div>
               ) : (
-                filteredTimeline.map((item, idx) => (
+                visibleTimeline.map((item, idx) => (
                   <div key={idx} className="flex gap-2.5 items-start">
                     <span className="text-[10px] font-mono text-slate-500 tracking-wider font-bold shrink-0 mt-0.5">
                       {item.time}
@@ -553,39 +405,24 @@ export default function FifaDashboard() {
                 ))
               )}
             </div>
+
+            {filteredTimeline.length > 5 && (
+              <div className="pt-2 border-t border-slate-900/60 mt-3 flex justify-center shrink-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllTimeline(!showAllTimeline)}
+                  className="text-[10px] text-cyan-400 hover:text-cyan-300 hover:bg-slate-900/40 font-bold cursor-pointer h-7 px-3 rounded-lg"
+                >
+                  {showAllTimeline ? 'Show Less' : 'View Full Timeline'}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Recharts Analytics chart */}
-      <Card className="bg-[#080d19]/45 border-slate-900/60 overflow-hidden p-6 space-y-4">
-        <div>
-          <h3 className="text-sm font-bold text-white">Matchday Capacity Utilization Matrix</h3>
-          <p className="text-xs text-slate-400">Total ingress visitor distribution trends across primary quadrants.</p>
-        </div>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="colorVan" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.4}/>
-                  <stop offset="95%" stopColor="#22d3ee" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="colorNY" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.4}/>
-                  <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="name" stroke="#64748b" fontSize={10} className="font-mono" />
-              <YAxis stroke="#64748b" fontSize={10} className="font-mono" />
-              <Tooltip contentStyle={{ backgroundColor: '#090d16', border: '1px solid #1e293b', borderRadius: '8px' }} />
-              <Legend verticalAlign="top" height={36} iconType="circle" />
-              <Area type="monotone" dataKey="Vancouver" stroke="#22d3ee" fillOpacity={1} fill="url(#colorVan)" strokeWidth={2} />
-              <Area type="monotone" dataKey="NY" stroke="#f43f5e" fillOpacity={1} fill="url(#colorNY)" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
+
 
       {/* ----------------------------------------------------
           5. AFTER ACTION REPORT MOCK PDF DIALOG OVERLAY

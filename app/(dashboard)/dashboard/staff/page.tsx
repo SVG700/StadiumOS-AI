@@ -137,7 +137,10 @@ export default function StaffDashboard() {
     e.preventDefault();
     if (!accessEmail || !accessLocation) return;
 
-    claimAccessibility(`access-${Date.now()}`); // Mock request creation through dispatcher
+    const uniqueAccessId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? `access-${crypto.randomUUID()}`
+      : `access-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    claimAccessibility(uniqueAccessId); // Mock request creation through dispatcher
     setAccessEmail('');
     setAccessType('wheelchair');
     setAccessLocation('');

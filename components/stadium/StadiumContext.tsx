@@ -684,7 +684,10 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const triggerNotif = useCallback((message: string, type: NotificationItem['type'] = 'operational') => {
     const time = new Date().toTimeString().split(' ')[0].substring(0, 5);
     setNotifications(prevNotifications => {
-      const updated = [{ id: `not-${Date.now()}`, message, type, read: false, timestamp: time }, ...prevNotifications];
+      const uniqueId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? `not-${crypto.randomUUID()}`
+        : `not-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const updated = [{ id: uniqueId, message, type, read: false, timestamp: time }, ...prevNotifications];
       localStorage.setItem('stadium_notifications', JSON.stringify(updated));
       return updated;
     });
@@ -798,7 +801,9 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const target = INCIDENT_TEMPLATES[Math.floor(Math.random() * INCIDENT_TEMPLATES.length)];
     const newInc: SimulatedIncident = {
-      id: `sim-inc-${Date.now()}`,
+      id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? `sim-inc-${crypto.randomUUID()}`
+        : `sim-inc-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       title: target.title,
       type: target.type,
       severity: target.severity,
@@ -1136,7 +1141,9 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     const historyItem: OperationHistoryItem = {
-      id: `hist-${Date.now()}`,
+      id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? `hist-${crypto.randomUUID()}`
+        : `hist-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       prompt,
       time: new Date().toTimeString().split(' ')[0].substring(0, 5),
       actionName: actionType,
@@ -1190,7 +1197,9 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const rejectRecommendation = (actionType: string, prompt: string) => {
     const historyItem: OperationHistoryItem = {
-      id: `hist-${Date.now()}`,
+      id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? `hist-${crypto.randomUUID()}`
+        : `hist-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       prompt,
       time: new Date().toTimeString().split(' ')[0].substring(0, 5),
       actionName: actionType,
@@ -1209,7 +1218,9 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const addTask = (task: Omit<TaskAssignment, 'id' | 'status'>) => {
     const newTask: TaskAssignment = {
       ...task,
-      id: `task-${Date.now()}`,
+      id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? `task-${crypto.randomUUID()}`
+        : `task-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       status: 'pending'
     };
     updateActiveStadium({
@@ -1234,7 +1245,9 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const addEmergency = (alert: Omit<EmergencyAlert, 'id' | 'timestamp' | 'status'>) => {
     const newAlert: EmergencyAlert = {
       ...alert,
-      id: `alert-${Date.now()}`,
+      id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? `alert-${crypto.randomUUID()}`
+        : `alert-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       timestamp: new Date().toISOString(),
       status: 'active'
     };

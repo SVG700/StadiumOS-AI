@@ -44,6 +44,7 @@ const STAFF_ITEMS: SidebarItem[] = [
 const FIFA_ITEMS: SidebarItem[] = [
   { name: 'Executive Dashboard', href: '/dashboard/fifa', icon: Home },
   { name: 'Sustainability Reports', href: '/sustainability', icon: Leaf },
+  { name: 'Executive AI Copilot', href: '/dashboard/fifa/ai', icon: Bot },
 ];
 
 const ROLE_ALLOWED_ROUTES: Record<string, string[]> = {
@@ -69,6 +70,7 @@ const ROLE_ALLOWED_ROUTES: Record<string, string[]> = {
   ],
   fifa: [
     '/dashboard/fifa',
+    '/dashboard/fifa/ai',
     '/sustainability',
     '/access-denied',
   ],
