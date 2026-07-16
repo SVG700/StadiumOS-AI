@@ -48,7 +48,7 @@ const Cell = dynamic(
 );
 import { 
   Users, ShieldAlert, Activity, Bus, Accessibility, Clock, UserCheck, PlusCircle, 
-  RefreshCw, ClipboardList, AlertOctagon, CheckSquare, CheckCircle, Trophy, Sparkles
+  RefreshCw, ClipboardList, AlertOctagon, CheckSquare, CheckCircle, Trophy, Sparkles, Leaf
 } from 'lucide-react';
 
 export default function StaffDashboard() {
@@ -139,7 +139,7 @@ export default function StaffDashboard() {
 
     const uniqueAccessId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? `access-${crypto.randomUUID()}`
-      : `access-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      : `access-${Date.now()}-${Math.random().toString(36).slice(2,9)}`;
     claimAccessibility(uniqueAccessId); // Mock request creation through dispatcher
     setAccessEmail('');
     setAccessType('wheelchair');
@@ -440,7 +440,7 @@ export default function StaffDashboard() {
       {/* OPERATIONS LOGS & TIMELINE ROW */}
       <div className="grid gap-6 md:grid-cols-3">
         {/* Live Operations Timeline */}
-        <Card className="md:col-span-2 flex flex-col h-[380px] bg-[#080d19]/45 border-slate-900/60">
+        <Card className="flex flex-col h-[380px] bg-[#080d19]/45 border-slate-900/60">
           <CardHeader className="pb-3 border-b border-slate-900/30">
             <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-white">
               <Clock className="h-4.5 w-4.5 text-cyan-400" />
@@ -516,6 +516,64 @@ export default function StaffDashboard() {
                 </div>
               ))
             )}
+          </CardContent>
+        </Card>
+
+        {/* Sustainability Operations Widget */}
+        <Card className="flex flex-col h-[380px] bg-[#080d19]/45 border-slate-900/60">
+          <CardHeader className="pb-3 border-b border-slate-900/30">
+            <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-emerald-400">
+              <Leaf className="h-4.5 w-4.5" />
+              Sustainability Operations
+            </CardTitle>
+            <CardDescription className="text-xs">Waste & resource telemetry audits</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 overflow-y-auto px-6 py-4 space-y-3.5 text-xs">
+            {/* Recycling Bins */}
+            <div className="space-y-1.5">
+              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block font-mono">Recycling Bin Status</span>
+              <div className="grid grid-cols-3 gap-1.5 text-[10px] text-center">
+                <div className="p-1.5 rounded border border-slate-900 bg-slate-950/40">
+                  <span className="text-slate-400 block truncate">Organic</span>
+                  <span className="font-bold text-emerald-400">75% (Stable)</span>
+                </div>
+                <div className="p-1.5 rounded border border-slate-900 bg-slate-950/40">
+                  <span className="text-slate-400 block truncate">Plastic</span>
+                  <span className="font-bold text-emerald-400">45% (Stable)</span>
+                </div>
+                <div className="p-1.5 rounded border border-slate-900 bg-[#ef4444]/10 border-[#ef4444]/20">
+                  <span className="text-slate-400 block truncate">General</span>
+                  <span className="font-bold text-rose-400">90% (Service Req)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Water Refill Stations */}
+            <div className="p-2.5 rounded-lg border border-slate-900 bg-slate-950/40 flex justify-between items-center">
+              <div>
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block font-mono">Water Refill Stations</span>
+                <span className="text-slate-200 font-bold block mt-0.5">8 / 8 Stations Online</span>
+              </div>
+              <Badge variant="success" className="text-[9px] uppercase tracking-wider">Active</Badge>
+            </div>
+
+            {/* Waste Collection Schedule */}
+            <div className="p-2.5 rounded-lg border border-slate-900 bg-slate-950/40 flex justify-between items-center">
+              <div>
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block font-mono">Waste Collection Schedule</span>
+                <span className="text-slate-200 font-bold block mt-0.5">Next Sweep: 22:30 (Halftime)</span>
+              </div>
+              <Badge variant="cyan" className="text-[9px] uppercase tracking-wider font-mono">ON SCHEDULE</Badge>
+            </div>
+
+            {/* Energy Grid Status / Alerts */}
+            <div className="p-2.5 rounded-lg border border-slate-900 bg-slate-950/40 flex justify-between items-center">
+              <div>
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block font-mono">Energy Grid Alerts</span>
+                <span className="text-slate-200 font-bold block mt-0.5">Solar Canopy Load: 3,600 kW</span>
+              </div>
+              <Badge variant="success" className="text-[9px] uppercase tracking-wider">Optimal</Badge>
+            </div>
           </CardContent>
         </Card>
       </div>

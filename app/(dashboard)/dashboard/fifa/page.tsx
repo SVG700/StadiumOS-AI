@@ -226,7 +226,81 @@ export default function FifaDashboard() {
       </div>
 
       {/* ----------------------------------------------------
-          3. MATCH OPERATIONS CENTER (Compact Full-Width Banner)
+          3. EXECUTIVE SUSTAINABILITY AUDITING
+          ---------------------------------------------------- */}
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* Carbon & Energy Stats */}
+        <Card className="bg-[#080d19]/45 border-slate-900/60 overflow-hidden flex flex-col justify-between p-4.5">
+          <CardHeader className="p-0 pb-3 space-y-1">
+            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block font-mono">Operations Audit</span>
+            <CardTitle className="text-sm font-semibold text-white">Tournament Carbon & Water Ledger</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 space-y-3.5 text-xs">
+            <div className="flex justify-between items-center p-2 rounded bg-slate-950/40 border border-slate-900">
+              <span className="text-slate-400">Total Tournament Emissions:</span>
+              <span className="text-white font-extrabold">24,802 Tons CO₂e</span>
+            </div>
+            <div className="flex justify-between items-center p-2 rounded bg-slate-950/40 border border-slate-900">
+              <span className="text-slate-400">Average Renewable Ratio:</span>
+              <span className="text-emerald-400 font-extrabold">86.2%</span>
+            </div>
+            <div className="flex justify-between items-center p-2 rounded bg-slate-950/40 border border-slate-900">
+              <span className="text-slate-400">Cumulative Water Usage:</span>
+              <span className="text-white font-extrabold">1.48M Litres</span>
+            </div>
+            <div className="flex justify-between items-center p-2 rounded bg-slate-950/40 border border-slate-900">
+              <span className="text-slate-400">Waste Diversion Rate:</span>
+              <span className="text-cyan-400 font-extrabold">78.4%</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Stadium Energy Ranking */}
+        <Card className="bg-[#080d19]/45 border-slate-900/60 overflow-hidden flex flex-col justify-between p-4.5">
+          <CardHeader className="p-0 pb-3 space-y-1">
+            <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest block font-mono">Rankings</span>
+            <CardTitle className="text-sm font-semibold text-white">Stadium Resource Rankings</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 space-y-3.5 text-xs">
+            <div className="p-2.5 rounded-lg border border-slate-900 bg-slate-950/40 space-y-1">
+              <span className="text-slate-500 block uppercase font-mono text-[9px]">Highest Energy Consumption</span>
+              <span className="text-white font-bold block">New York MetLife Stadium</span>
+              <span className="text-slate-400 text-[10px] block">Draw: 5,400 kW peak load</span>
+            </div>
+            <div className="p-2.5 rounded-lg border border-slate-900 bg-slate-950/40 space-y-1">
+              <span className="text-slate-500 block uppercase font-mono text-[9px]">Lowest Carbon Footprint</span>
+              <span className="text-emerald-400 font-bold block">Vancouver BC Place Stadium</span>
+              <span className="text-slate-400 text-[10px] block">Avg emissions: 0.38 tCO₂e/h</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* AI Insight Panel */}
+        <Card className="bg-[#080d19]/45 border-slate-900/60 overflow-hidden flex flex-col justify-between p-4.5 relative">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-purple-500/5 to-transparent blur-2xl rounded-full" />
+          <CardHeader className="p-0 pb-3 space-y-1">
+            <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest block font-mono">AI Twin Insights</span>
+            <CardTitle className="text-sm font-semibold text-white">Sustainability Insights</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 space-y-3 text-[11px] leading-relaxed text-slate-300">
+            <div className="p-2.5 rounded border border-slate-900 bg-slate-950/20 flex gap-2 items-start">
+              <span className="text-purple-400 font-bold">✦</span>
+              <span>Renewable energy usage has increased 8% since Matchday 5.</span>
+            </div>
+            <div className="p-2.5 rounded border border-slate-900 bg-slate-950/20 flex gap-2 items-start">
+              <span className="text-purple-400 font-bold">✦</span>
+              <span>Water optimization has reduced consumption by 12%.</span>
+            </div>
+            <div className="p-2.5 rounded border border-slate-900 bg-slate-950/20 flex gap-2 items-start">
+              <span className="text-purple-400 font-bold">✦</span>
+              <span>Mexico City Stadium is currently the most energy-efficient venue.</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ----------------------------------------------------
+          4. MATCH OPERATIONS CENTER (Compact Full-Width Banner)
           ---------------------------------------------------- */}
       <Card className="bg-[#080d19]/45 border-slate-900/60 overflow-hidden">
         <CardContent className="p-4 flex flex-col lg:flex-row items-center justify-between gap-4">

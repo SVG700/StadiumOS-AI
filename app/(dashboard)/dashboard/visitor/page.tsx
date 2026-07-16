@@ -198,17 +198,30 @@ export default function VisitorDashboard() {
           </Card>
         </Link>
 
-        <Link href="/sustainability" className="block group">
-          <Card className="h-full bg-[#080d19]/45 border-slate-900/60 hover:border-emerald-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-950/10 cursor-pointer">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-400">Eco-Rewards Hub</CardTitle>
-              <Leaf className="h-4.5 w-4.5 text-emerald-400" />
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-slate-400 mt-1">Participate in carbon recycling challenges to unlock FIFA rewards.</p>
-            </CardContent>
-          </Card>
-        </Link>
+        <Card className="h-full bg-[#080d19]/45 border-slate-900/60 flex flex-col justify-between p-4.5 space-y-2">
+          <div className="flex flex-row items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Sustainability Impact</span>
+            <Leaf className="h-4.5 w-4.5 text-emerald-400" />
+          </div>
+          <div className="space-y-2 text-xs flex-1 flex flex-col justify-between pt-1">
+            <div className="flex items-center gap-1.5 text-emerald-400 font-semibold text-[11px]">
+              <span>✓</span> You arrived using Metro
+            </div>
+            <div className="p-2 rounded bg-slate-950/40 border border-slate-900 flex justify-between items-center">
+              <span className="text-slate-500 text-[10px]">Carbon Saved:</span>
+              <span className="text-white font-extrabold">1.8 kg CO₂</span>
+            </div>
+            <div className="text-[10px] text-slate-400 space-y-0.5">
+              <span className="block text-slate-500 font-mono text-[9px] uppercase tracking-wider">Equivalent to:</span>
+              <div className="flex items-center gap-1">
+                <span className="text-emerald-500">•</span> avoiding a 7 km car trip
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-emerald-500">•</span> planting 0.09 trees
+              </div>
+            </div>
+          </div>
+        </Card>
       </div>
 
       {/* MATCH TICKET PREVIEW & CONCESSIONS PROMO */}

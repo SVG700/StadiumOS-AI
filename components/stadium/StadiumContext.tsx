@@ -581,7 +581,7 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const savedSelectedId = getL('stadium_selected_id', 'vancouver');
       const savedTimeline = getL('stadium_ops_timeline', INITIAL_TIMELINE);
       const savedNotifs = getL('stadium_notifications', INITIAL_NOTIFICATIONS);
-      const savedHistory = getL('stadium_ops_history', []);
+      const savedHistory = getL<OperationHistoryItem[]>('stadium_ops_history', []);
 
       // Sanitize stadium list items (incidents, tasks, alerts)
       const sanitizedStadiums = savedStadiums.map(stadium => {
@@ -590,42 +590,45 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const seenAlertIds = new Set<string>();
 
         const incidents = (stadium.simulatedIncidents || []).map(inc => {
-          const isOld = inc.id.match(/^sim-inc-\d+$/);
-          if (isOld || seenIncidentIds.has(inc.id)) {
+          const idStr = String(inc.id);
+          const isOld = idStr.match(/^sim-inc-\d+$/) || !idStr.startsWith('sim-inc-');
+          if (isOld || seenIncidentIds.has(idStr)) {
             const newId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
               ? `sim-inc-${crypto.randomUUID()}`
-              : `sim-inc-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+              : `sim-inc-${Date.now()}-${Math.random().toString(36).slice(2,9)}`;
             seenIncidentIds.add(newId);
             return { ...inc, id: newId };
           }
-          seenIncidentIds.add(inc.id);
-          return inc;
+          seenIncidentIds.add(idStr);
+          return { ...inc, id: idStr };
         });
 
         const tasks = (stadium.tasks || []).map(task => {
-          const isOld = task.id.match(/^task-\d+$/);
-          if (isOld || seenTaskIds.has(task.id)) {
+          const idStr = String(task.id);
+          const isOld = idStr.match(/^task-\d+$/) || !idStr.startsWith('task-');
+          if (isOld || seenTaskIds.has(idStr)) {
             const newId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
               ? `task-${crypto.randomUUID()}`
-              : `task-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+              : `task-${Date.now()}-${Math.random().toString(36).slice(2,9)}`;
             seenTaskIds.add(newId);
             return { ...task, id: newId };
           }
-          seenTaskIds.add(task.id);
-          return task;
+          seenTaskIds.add(idStr);
+          return { ...task, id: idStr };
         });
 
         const alerts = (stadium.alerts || []).map(alert => {
-          const isOld = alert.id.match(/^alert-\d+$/);
-          if (isOld || seenAlertIds.has(alert.id)) {
+          const idStr = String(alert.id);
+          const isOld = idStr.match(/^alert-\d+$/) || !idStr.startsWith('alert-');
+          if (isOld || seenAlertIds.has(idStr)) {
             const newId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
               ? `alert-${crypto.randomUUID()}`
-              : `alert-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+              : `alert-${Date.now()}-${Math.random().toString(36).slice(2,9)}`;
             seenAlertIds.add(newId);
             return { ...alert, id: newId };
           }
-          seenAlertIds.add(alert.id);
-          return alert;
+          seenAlertIds.add(idStr);
+          return { ...alert, id: idStr };
         });
 
         return {
@@ -639,31 +642,33 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // Sanitize notifications
       const seenNotifIds = new Set<string>();
       const sanitizedNotifs = savedNotifs.map(n => {
-        const isOldFormat = n.id.match(/^not-\d+$/);
-        if (isOldFormat || seenNotifIds.has(n.id)) {
+        const idStr = String(n.id);
+        const isOldFormat = idStr.match(/^not-\d+$/) || !idStr.startsWith('not-');
+        if (isOldFormat || seenNotifIds.has(idStr)) {
           const newId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
             ? `not-${crypto.randomUUID()}`
-            : `not-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+            : `not-${Date.now()}-${Math.random().toString(36).slice(2,9)}`;
           seenNotifIds.add(newId);
           return { ...n, id: newId };
         }
-        seenNotifIds.add(n.id);
-        return n;
+        seenNotifIds.add(idStr);
+        return { ...n, id: idStr };
       });
 
       // Sanitize history
       const seenHistoryIds = new Set<string>();
       const sanitizedHistory = savedHistory.map(h => {
-        const isOldFormat = h.id.match(/^hist-\d+$/);
-        if (isOldFormat || seenHistoryIds.has(h.id)) {
+        const idStr = String(h.id);
+        const isOldFormat = idStr.match(/^hist-\d+$/) || !idStr.startsWith('hist-');
+        if (isOldFormat || seenHistoryIds.has(idStr)) {
           const newId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
             ? `hist-${crypto.randomUUID()}`
-            : `hist-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+            : `hist-${Date.now()}-${Math.random().toString(36).slice(2,9)}`;
           seenHistoryIds.add(newId);
           return { ...h, id: newId };
         }
-        seenHistoryIds.add(h.id);
-        return h;
+        seenHistoryIds.add(idStr);
+        return { ...h, id: idStr };
       });
 
       // Write sanitized states back to localStorage
@@ -774,7 +779,7 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setNotifications(prevNotifications => {
       const uniqueId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? `not-${crypto.randomUUID()}`
-        : `not-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+        : `not-${Date.now()}-${Math.random().toString(36).slice(2,9)}`;
       const updated = [{ id: uniqueId, message, type, read: false, timestamp: time }, ...prevNotifications];
       localStorage.setItem('stadium_notifications', JSON.stringify(updated));
       return updated;
@@ -891,7 +896,7 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const newInc: SimulatedIncident = {
       id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? `sim-inc-${crypto.randomUUID()}`
-        : `sim-inc-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        : `sim-inc-${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
       title: target.title,
       type: target.type,
       severity: target.severity,
@@ -1231,7 +1236,7 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const historyItem: OperationHistoryItem = {
       id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? `hist-${crypto.randomUUID()}`
-        : `hist-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        : `hist-${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
       prompt,
       time: new Date().toTimeString().split(' ')[0].substring(0, 5),
       actionName: actionType,
@@ -1287,7 +1292,7 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const historyItem: OperationHistoryItem = {
       id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? `hist-${crypto.randomUUID()}`
-        : `hist-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        : `hist-${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
       prompt,
       time: new Date().toTimeString().split(' ')[0].substring(0, 5),
       actionName: actionType,
@@ -1308,7 +1313,7 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ...task,
       id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? `task-${crypto.randomUUID()}`
-        : `task-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        : `task-${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
       status: 'pending'
     };
     updateActiveStadium({
@@ -1335,7 +1340,7 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ...alert,
       id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? `alert-${crypto.randomUUID()}`
-        : `alert-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        : `alert-${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
       timestamp: new Date().toISOString(),
       status: 'active'
     };
