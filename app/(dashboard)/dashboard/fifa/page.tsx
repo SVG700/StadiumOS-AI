@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -89,6 +90,13 @@ export default function FifaDashboard() {
             <p className="text-xs text-slate-400 mt-1">
               Global operations overview for Matchday 12. Active selected venue: <strong className="text-cyan-400">{selectedStadium.name} ({selectedStadium.city})</strong>.
             </p>
+            <div className="mt-3 flex items-center gap-2">
+              <Link href="/dashboard/fifa/access-requests">
+                <Button size="sm" className="bg-cyan-950/40 hover:bg-cyan-900/30 text-cyan-400 hover:text-white border border-cyan-800/40 hover:border-cyan-500/50 text-[10px] h-8 px-3 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer font-bold uppercase tracking-wider">
+                  <span>🛡️ Manage Access Requests</span>
+                </Button>
+              </Link>
+            </div>
           </div>
 
           {/* Match Phase Engine Selectors */}
@@ -96,12 +104,12 @@ export default function FifaDashboard() {
             <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest block font-mono">
               ⚡ Live Match Phase Engine
             </span>
-            <div className="grid grid-cols-4 gap-1.5">
-              {(['pre-match', 'kickoff', 'first-half', 'halftime', 'second-half', 'full-time', 'exit-phase', 'venue-closed'] as MatchPhase[]).map((phase) => (
+            <div className="grid grid-cols-3 gap-1.5">
+              {(['pre-match', 'first-half', 'halftime', 'second-half', 'full-time', 'penalties'] as MatchPhase[]).map((phase) => (
                 <button
                   key={phase}
                   onClick={() => changeMatchPhase(phase)}
-                  className={`text-[9px] font-bold py-1 px-1 rounded transition capitalize select-none cursor-pointer ${
+                  className={`text-[9px] font-bold py-1.5 px-1 rounded transition capitalize select-none cursor-pointer text-center ${
                     selectedStadium.matchPhase === phase 
                       ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/30' 
                       : 'bg-slate-900 hover:bg-slate-800 text-slate-400'

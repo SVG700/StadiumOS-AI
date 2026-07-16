@@ -1,18 +1,33 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
 import { sendChatMessage } from '@/app/actions/chat';
 import { ChatMessage } from '@/types';
+
+interface Conversation {
+  id: string;
+  user_id: string;
+  role: 'visitor' | 'staff' | 'fifa';
+  title: string;
+  created_at: string;
+  updated_at: string;
+  metadata?: string;
+}
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useStadium } from '@/components/stadium/StadiumContext';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { DatabaseService } from '@/lib/db';
+import { jsPDF } from 'jspdf';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Bot, Send, User, Sparkles, Terminal, CheckCircle, AlertTriangle, Info, Map, 
-  ShieldAlert, PhoneCall, Accessibility, Check, X, ShieldCheck
+  ShieldAlert, PhoneCall, Accessibility, Check, X, ShieldCheck, Search, Plus,
+  Pin, Trash2, Edit2, Download, RefreshCw
 } from 'lucide-react';
 
 const QUICK_PROMPTS_VISITOR = [
@@ -35,7 +50,6 @@ interface Toast {
   type: 'success' | 'info' | 'warning';
 }
 
-// Purity helpers defined outside the component scope
 let messageCounter = 0;
 const generateUniqueId = (prefix: string) => `${prefix}-${++messageCounter}-${Math.random().toString(36).substring(2, 6)}`;
 const getIsoTimestamp = () => new Date().toISOString();
@@ -44,15 +58,31 @@ export default function AIAssistantPage() {
   const { user } = useAuth();
 
   // Shared Stadium Context
-  const { executeAction, rejectRecommendation } = useStadium();
+  const { 
+    stadiums,
+    selectedStadium, 
+    selectStadium, 
+    executeAction, 
+    rejectRecommendation 
+  } = useStadium();
   
+  // Conversations List & Active Selection
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConv, setActiveConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   
-  // Custom AI thinking states
+  // Inline Renaming State
+  const [editingConvId, setEditingConvId] = useState<string | null>(null);
+  const [renameTitle, setRenameTitle] = useState('');
+
+  // AI assistant input states
+  const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [thinkingIndex, setThinkingIndex] = useState(0);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [contextAlert, setContextAlert] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   const isVisitor = user?.role === 'visitor' || user?.role === 'fan';
@@ -66,25 +96,55 @@ export default function AIAssistantPage() {
     'Generating operations plan...'
   ];
 
-  // Initialize welcome message based on role
+  const quickPrompts = isVisitor ? QUICK_PROMPTS_VISITOR : QUICK_PROMPTS_STAFF;
+
+  // 2. Select conversation & restore context
+  const handleSelectConversation = React.useCallback(async (conv: Conversation) => {
+    setActiveConv(conv);
+    setContextAlert(null);
+    
+    // Fetch conversation messages
+    const msgs = await DatabaseService.getMessages(conv.id);
+    setMessages(msgs);
+
+    // Restore Stadium context if metadata is present
+    if (conv.metadata) {
+      try {
+        const metadata = JSON.parse(conv.metadata);
+        if (metadata.stadiumId) {
+          selectStadium(metadata.stadiumId);
+          setContextAlert(`Restored context: Analysing ${metadata.stadiumName} during Matchday ${metadata.matchday || 12}.`);
+          setTimeout(() => setContextAlert(null), 5000);
+        }
+      } catch (e) {
+        console.warn('Failed to parse metadata context:', e);
+      }
+    }
+  }, [selectStadium]);
+
+  // 1. Initial Load: Fetch Pinned Chats & Conversations
   useEffect(() => {
-    const content = isVisitor
-      ? `Welcome to Stadium Alpha! I am your **FIFA Fan Companion AI**. \n\nI can help you locate your seat, find the nearest restrooms, locate concessions/tacos, get parking guidance, book wheelchair assistance, or request security and volunteers.\n\nWhat can I help you find in the stadium today?`
-      : `Hello! I am the **StadiumOS AI Decision Engine**. \n\nI monitor live camera feeds, gate queues, transit schedules, emergency dispatches, and green grids. \n\nSubmit operational prompts to analyze risks, deploy personnel, or adjust stadium parameters.`;
+    if (!user) return;
+    
+    // Load pins from localStorage
+    const savedPins = localStorage.getItem(`stadium_pinned_${user.role}_chats`);
+    if (savedPins) {
+      setTimeout(() => {
+        setPinnedIds(JSON.parse(savedPins));
+      }, 0);
+    }
 
-    const timer = setTimeout(() => {
-      setMessages([
-        {
-          id: 'welcome',
-          sender: 'assistant',
-          content,
-          timestamp: getIsoTimestamp(),
-        },
-      ]);
-    }, 0);
-
-    return () => clearTimeout(timer);
-  }, [isVisitor]);
+    async function loadConversations() {
+      const data = await DatabaseService.getConversations(user!.id, user!.role);
+      setConversations(data);
+      
+      // Auto-open most recent conversation
+      if (data.length > 0) {
+        handleSelectConversation(data[0]);
+      }
+    }
+    loadConversations();
+  }, [user, handleSelectConversation]);
 
   // Auto-scroll to bottom of chat
   useEffect(() => {
@@ -93,18 +153,65 @@ export default function AIAssistantPage() {
 
   const showToast = (message: string, type: 'success' | 'info' | 'warning' = 'success') => {
     const id = generateUniqueId('toast');
-    setToasts((prev) => [...prev, { id, message, type }]);
+    setToasts((prev: Toast[]) => [...prev, { id, message, type }]);
     setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
+      setToasts((prev: Toast[]) => prev.filter((t) => t.id !== id));
     }, 4000);
   };
 
+  // 3. New Chat Creation
+  const handleNewChat = async (initialQuery?: string) => {
+    if (!user) return;
+
+    // Build context metadata for recovery
+    const metadata = {
+      stadiumId: selectedStadium.id,
+      stadiumName: selectedStadium.name,
+      matchday: '12',
+      stage: selectedStadium.match?.stage || 'Quarter Final',
+      dashboard: user.role,
+      timestamp: new Date().toISOString()
+    };
+
+    const defaultTitle = initialQuery 
+      ? (initialQuery.length > 30 ? `${initialQuery.substring(0, 30)}...` : initialQuery)
+      : (isVisitor ? 'Fan Companion Chat' : `Operations - ${selectedStadium.city} M12`);
+
+    const newConv = await DatabaseService.createConversation(
+      user.id,
+      user.role as any,
+      defaultTitle,
+      metadata
+    );
+
+    // Add initial welcome system message if no starter query
+    if (!initialQuery) {
+      const welcomeText = isVisitor
+        ? `Welcome to Stadium Alpha! I am your **FIFA Fan Companion AI**. \n\nI can help you locate your seat, find the nearest restrooms, locate concessions/tacos, get parking guidance, book wheelchair assistance, or request security and volunteers.\n\nWhat can I help you find in the stadium today?`
+        : `Hello! I am the **StadiumOS AI Decision Engine**. \n\nI monitor live camera feeds, gate queues, transit schedules, emergency dispatches, and green grids. \n\nSubmit operational prompts to analyze risks, deploy personnel, or adjust stadium parameters.`;
+      
+      await DatabaseService.addMessage(newConv.id, 'assistant', welcomeText);
+    }
+
+    // Refresh list
+    const updatedList = await DatabaseService.getConversations(user.id, user.role);
+    setConversations(updatedList);
+    
+    // Select newly created chat
+    const match = updatedList.find(c => c.id === newConv.id);
+    if (match) {
+      await handleSelectConversation(match);
+      if (initialQuery) {
+        await handleSendMessage(initialQuery, match);
+      }
+    }
+  };
+
+  // 4. Action Handlers
   const handleApplyAction = async (actionType: string, promptText: string) => {
-    // Show AI thinking screen loader from layout by triggering isThinking momentarily
     setIsThinking(true);
     setThinkingIndex(0);
 
-    // Loop through steps
     for (let i = 0; i < THINKING_STEPS.length; i++) {
       setThinkingIndex(i);
       await new Promise(r => setTimeout(r, 450));
@@ -118,155 +225,136 @@ export default function AIAssistantPage() {
     rejectRecommendation(actionType, promptText);
     showToast('AI recommendation rejected by FIFA Board.', 'warning');
     
-    setMessages(prev => [
-      ...prev,
-      {
-        id: generateUniqueId('system-reject'),
-        sender: 'system',
-        content: `❌ **AI Recommendation Rejected**: ${actionType.replace('_', ' ')} declined by executive command.`,
-        timestamp: getIsoTimestamp()
-      }
-    ]);
+    if (activeConv) {
+      DatabaseService.addMessage(
+        activeConv.id,
+        'system',
+        `❌ **AI Recommendation Rejected**: ${actionType.replace('_', ' ')} declined by executive command.`
+      ).then(() => {
+        if (activeConv) handleSelectConversation(activeConv);
+      });
+    }
   };
 
+  const executeAllPlan = async (acts: string[], promptText: string) => {
+    setIsThinking(true);
+    for (let i = 0; i < THINKING_STEPS.length; i++) {
+      setThinkingIndex(i);
+      await new Promise(r => setTimeout(r, 450));
+    }
+    setIsThinking(false);
+
+    for (const act of acts) {
+      await executeAction(act, promptText);
+      await new Promise(r => setTimeout(r, 300));
+    }
+    showToast('All multi-step AI plan dispatches applied successfully.', 'success');
+  };
+
+  // 5. Simulated Responses
   const getSimulatedResponse = (text: string): string => {
     const q = text.toLowerCase();
     
-    // VISITOR QUERIES
     if (isVisitor) {
       if (q.includes('seat')) {
-        return `Your ticketed seat is located at **Section 102, Row H, Seat 14** (Gate 4 North Side Recommended entrance). 
-[ACTION:OPEN_NAVIGATION]`;
+        return `Your ticketed seat is located at **Section 102, Row H, Seat 14** (Gate 4 North Side Recommended entrance). \n[ACTION:OPEN_NAVIGATION]`;
       }
       if (q.includes('restroom') || q.includes('toilet') || q.includes('bathroom')) {
-        return `The nearest restroom is located on the **Concourse West Loop Level 1**, approximately 25 meters from your seating section 102.
-[ACTION:OPEN_NAVIGATION]`;
+        return `The nearest restroom is located on the **Concourse West Loop Level 1**, approximately 25 meters from your seating section 102.\n[ACTION:OPEN_NAVIGATION]`;
       }
       if (q.includes('food') || q.includes('concession') || q.includes('eat') || q.includes('taco') || q.includes('drink') || q.includes('hungry')) {
-        return `Concessions A (offering premium hotdogs, tacos, pre-match pretzels, and soft drinks) is directly adjacent to the **Section 102 entrance door**.
-[ACTION:OPEN_NAVIGATION]`;
+        return `Concessions A (offering premium hotdogs, tacos, pre-match pretzels, and soft drinks) is directly adjacent to the **Section 102 entrance door**.\n[ACTION:OPEN_NAVIGATION]`;
       }
       if (q.includes('parking') || q.includes('car')) {
-        return `Your spectator pass is assigned to **Parking Zone A** near the North boulevard. Walking distance to Gate 4 is 4 minutes.
-[ACTION:OPEN_NAVIGATION]`;
+        return `Your spectator pass is assigned to **Parking Zone A** near the North boulevard. Walking distance to Gate 4 is 4 minutes.\n[ACTION:OPEN_NAVIGATION]`;
       }
       if (q.includes('medical') || q.includes('first aid') || q.includes('doctor') || q.includes('injury') || q.includes('hurt')) {
-        return `Emergency Medical Pod 2 is located right beside the **Gate 4 turnstiles lobby**. Standby crews are ready.
-[ACTION:LOCATE_MEDICAL]`;
+        return `Emergency Medical Pod 2 is located right beside the **Gate 4 turnstiles lobby**. Standby crews are ready.\n[ACTION:LOCATE_MEDICAL]`;
       }
       if (q.includes('lost') || q.includes('child') || q.includes('security')) {
-        return `I understand you need immediate assistance. I am flagging a **Security Dispatch ticket** to Section 102 Row H immediately. A supervisor is being notified.
-[ACTION:REQUEST_HELP] [ACTION:CALL_VOLUNTEER]`;
+        return `I understand you need immediate assistance. I am flagging a **Security Dispatch ticket** to Section 102 Row H immediately. A supervisor is being notified.\n[ACTION:REQUEST_HELP] [ACTION:CALL_VOLUNTEER]`;
       }
       if (q.includes('wheelchair') || q.includes('disabled') || q.includes('assist')) {
-        return `We can arrange for an accessibility escort volunteer to assist with transfer or book a wheelchair.
-[ACTION:BOOK_WHEELCHAIR]`;
+        return `We can arrange for an accessibility escort volunteer to assist with transfer or book a wheelchair.\n[ACTION:BOOK_WHEELCHAIR]`;
       }
       if (q.includes('exit') || q.includes('leave') || q.includes('evacuate')) {
-        return `Spectator exits are located at all primary gates. The closest exit for you is **Gate 4 Corridor**.
-[ACTION:OPEN_NAVIGATION]`;
+        return `Spectator exits are located at all primary gates. The closest exit for you is **Gate 4 Corridor**.\n[ACTION:OPEN_NAVIGATION]`;
       }
       if (q.includes('transit') || q.includes('home') || q.includes('bus') || q.includes('metro')) {
-        return `Express metro shuttles run from the North Transit hub, operating every 4 minutes. Downtown buses depart from Gate 2 taxi bay.
-[ACTION:OPEN_NAVIGATION]`;
+        return `Express metro shuttles run from the North Transit hub, operating every 4 minutes. Downtown buses depart from Gate 2 taxi bay.\n[ACTION:OPEN_NAVIGATION]`;
       }
-      if (q.includes('merchandise') || q.includes('shop') || q.includes('jersey') || q.includes('scarf')) {
-        return `The official FIFA Fan Shop is located on the **South Concourse Loop** near Section 108.
-[ACTION:OPEN_NAVIGATION]`;
-      }
-    }
-
-    // STAFF / EXECUTIVE QUERIES
-    else {
+    } else {
       if (q.includes('gate') || q.includes('overcrowd') || q.includes('crowd')) {
-        return `Based on live telemetry from Gate 3 and current visitor inflow, I recommend opening Gate 4 turnstiles immediately while dispatching Crowd Control Alpha. This is expected to reduce congestion by approximately 31% within the next 12 minutes.
-[CONFIDENCE:96%] [RISK:Low] [IMPROVEMENT:31% congestion reduction] [ACTION:OPEN_GATE_4]`;
+        return `Based on live telemetry from Gate 3 and current visitor inflow, I recommend opening Gate 4 turnstiles immediately while dispatching Crowd Control Alpha. This is expected to reduce congestion by approximately 31% within the next 12 minutes.\n[CONFIDENCE:96%] [RISK:Low] [IMPROVEMENT:31% congestion reduction] [ACTION:OPEN_GATE_4]`;
       }
-      
       if (q.includes('rain') || q.includes('weather') || q.includes('storm')) {
-        return `Heavy rain is forecast to impact kick-off in 45 minutes. I have compiled a 4-step operational readiness plan to safeguard incoming spectators and coordinate staff dispatches.
-[CONFIDENCE:98%] [RISK:Low] [IMPROVEMENT:100% Dry Coverage] [PLAN:OPEN_GATE_4,REDIRECT_CROWD,ACTIVATE_ACCESSIBILITY,INCREASE_SHUTTLE]`;
+        return `Heavy rain is forecast to impact kick-off in 45 minutes. I have compiled a 4-step operational readiness plan to safeguard incoming spectators and coordinate staff dispatches.\n[CONFIDENCE:98%] [RISK:Low] [IMPROVEMENT:100% Dry Coverage] [PLAN:OPEN_GATE_4,REDIRECT_CROWD,ACTIVATE_ACCESSIBILITY,INCREASE_SHUTTLE]`;
       }
-
       if (q.includes('medical') || q.includes('help') || q.includes('sick') || q.includes('accident')) {
-        return `AI safety cameras flagged a heat exhaustion medical incident at Section 108. Recommended Action: Dispatch Medical Team 2 immediately.
-[CONFIDENCE:99%] [RISK:Low] [IMPROVEMENT:45s dispatch ETA] [ACTION:DEPLOY_MEDICAL]`;
+        return `AI safety cameras flagged a heat exhaustion medical incident at Section 108. Recommended Action: Dispatch Medical Team 2 immediately.\n[CONFIDENCE:99%] [RISK:Low] [IMPROVEMENT:45s dispatch ETA] [ACTION:DEPLOY_MEDICAL]`;
       }
-
       if (q.includes('shuttle') || q.includes('transit') || q.includes('bus') || q.includes('queue')) {
-        return `Express shuttle terminal queues are exceeding 15 minutes due to expressway traffic. Recommended Action: Double Metro Line B dispatch frequency.
-[CONFIDENCE:94%] [RISK:Low] [IMPROVEMENT:60% queue reduction] [ACTION:INCREASE_SHUTTLE]`;
+        return `Express shuttle terminal queues are exceeding 15 minutes due to expressway traffic. Recommended Action: Double Metro Line B dispatch frequency.\n[CONFIDENCE:94%] [RISK:Low] [IMPROVEMENT:60% queue reduction] [ACTION:INCREASE_SHUTTLE]`;
       }
-
       if (q.includes('accessibility') || q.includes('wheelchair') || q.includes('volunteers')) {
-        return `Wheelchair companion backlog detected at Gate 4 Turnstiles lobby. Recommended Action: Mobilize standby accessibility escorts.
-[CONFIDENCE:95%] [RISK:Low] [IMPROVEMENT:Clear queue] [ACTION:ACTIVATE_ACCESSIBILITY]`;
+        return `Wheelchair companion backlog detected at Gate 4 Turnstiles lobby. Recommended Action: Mobilize standby accessibility escorts.\n[CONFIDENCE:95%] [RISK:Low] [IMPROVEMENT:Clear queue] [ACTION:ACTIVATE_ACCESSIBILITY]`;
       }
-
       if (q.includes('energy') || q.includes('power') || q.includes('solar')) {
-        return `Peak grid consumption draw detected. Recommended Action: Dim secondary advertising screens to cut load.
-[CONFIDENCE:91%] [RISK:Low] [IMPROVEMENT:450 kW reclaimed] [ACTION:REDUCE_ENERGY]`;
-      }
-
-      if (q.includes('report') || q.includes('audit')) {
-        return `Concourse carbon offsets and solar logs compiled. Recommended Action: Generate matchday Sustainability Audit Report.
-[CONFIDENCE:99%] [RISK:Low] [IMPROVEMENT:100% Sync] [ACTION:GENERATE_REPORT]`;
+        return `Peak grid consumption draw detected. Recommended Action: Dim secondary advertising screens to cut load.\n[CONFIDENCE:91%] [RISK:Low] [IMPROVEMENT:450 kW reclaimed] [ACTION:REDUCE_ENERGY]`;
       }
     }
-
     return '';
   };
 
-  const handleSendMessage = async (textToSend: string) => {
-    if (!textToSend.trim() || isThinking) return;
+  // 6. Send message workflow
+  const handleSendMessage = async (textToSend: string, targetConv = activeConv) => {
+    if (!textToSend.trim() || isThinking || !user) return;
 
-    const userMsg: ChatMessage = {
-      id: generateUniqueId('user'),
-      sender: 'user',
-      content: textToSend,
-      timestamp: getIsoTimestamp(),
-    };
+    const conv = targetConv;
+    if (!conv) {
+      await handleNewChat(textToSend);
+      return;
+    }
 
-    setMessages((prev) => [...prev, userMsg]);
+    const userMsg = await DatabaseService.addMessage(conv.id, 'user', textToSend.trim());
+    setMessages((prev: ChatMessage[]) => [...prev, userMsg]);
     setInput('');
     setIsThinking(true);
     setThinkingIndex(0);
 
-    // Simulate thinking steps
+    // Simulated Thinking Loops
     for (let i = 0; i < THINKING_STEPS.length; i++) {
       setThinkingIndex(i);
-      await new Promise(r => setTimeout(r, 600));
+      await new Promise(r => setTimeout(r, 450));
     }
 
     const simulated = getSimulatedResponse(textToSend);
     if (simulated) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: generateUniqueId('assistant'),
-          sender: 'assistant',
-          content: simulated,
-          timestamp: getIsoTimestamp(),
-        },
-      ]);
+      const aiMsg = await DatabaseService.addMessage(conv.id, 'assistant', simulated);
+      setMessages((prev: ChatMessage[]) => [...prev, aiMsg]);
       setIsThinking(false);
+      
+      const updatedList = await DatabaseService.getConversations(user.id, user.role);
+      setConversations(updatedList);
       return;
     }
 
     try {
       const result = await sendChatMessage(textToSend);
+      const replyContent = result.success && result.reply 
+        ? result.reply 
+        : `Gemini Operational Hub: Target telemetry checked. Parameters nominal. No anomalies reported.`;
+
+      const aiMsg = await DatabaseService.addMessage(conv.id, 'assistant', replyContent);
+      setMessages((prev: ChatMessage[]) => [...prev, aiMsg]);
       
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: generateUniqueId('assistant'),
-          sender: 'assistant',
-          content: result.success && result.reply 
-            ? result.reply 
-            : `Gemini Operational Hub: Target telemetry checked. Parameters nominal. No anomalies reported.`,
-          timestamp: getIsoTimestamp(),
-        },
-      ]);
+      if (conv.title.startsWith('Operations -') && messages.length <= 2) {
+        const autoTitle = textToSend.length > 25 ? `${textToSend.substring(0, 25)}...` : textToSend;
+        await DatabaseService.updateConversationTitle(conv.id, autoTitle);
+      }
+      
+      const updatedList = await DatabaseService.getConversations(user.id, user.role);
+      setConversations(updatedList);
     } catch (err) {
       console.error('Chat error:', err);
     } finally {
@@ -278,11 +366,178 @@ export default function AIAssistantPage() {
     handleSendMessage(prompt);
   };
 
+  // 7. Pin / Unpin Chats
+  const togglePinChat = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    let updatedPins = [];
+    if (pinnedIds.includes(id)) {
+      updatedPins = pinnedIds.filter(pid => pid !== id);
+    } else {
+      updatedPins = [...pinnedIds, id];
+    }
+    setPinnedIds(updatedPins);
+    localStorage.setItem(`stadium_pinned_${user!.role}_chats`, JSON.stringify(updatedPins));
+  };
+
+  // 8. Delete Chat
+  const handleDeleteChat = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await DatabaseService.deleteConversation(id);
+    const updatedList = await DatabaseService.getConversations(user!.id, user!.role);
+    setConversations(updatedList);
+    
+    if (activeConv?.id === id) {
+      if (updatedList.length > 0) {
+        handleSelectConversation(updatedList[0]);
+      } else {
+        setActiveConv(null);
+        setMessages([]);
+      }
+    }
+  };
+
+  // 9. Rename Chat
+  const handleStartRename = (conv: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingConvId(conv.id);
+    setRenameTitle(conv.title);
+  };
+
+  const handleSaveRename = async (id: string) => {
+    if (!renameTitle.trim()) return;
+    await DatabaseService.updateConversationTitle(id, renameTitle.trim());
+    setEditingConvId(null);
+    const updatedList = await DatabaseService.getConversations(user!.id, user!.role);
+    setConversations(updatedList);
+    if (activeConv?.id === id) {
+      setActiveConv(prev => prev ? { ...prev, title: renameTitle.trim() } : null);
+    }
+  };
+
+  // 10. Multi-format export
+  const handleExport = (format: 'txt' | 'md' | 'pdf') => {
+    if (!activeConv || messages.length === 0) return;
+    const title = activeConv.title;
+    const dateStr = new Date(activeConv.created_at).toLocaleString();
+
+    let meta = '';
+    if (activeConv.metadata) {
+      try {
+        const m = JSON.parse(activeConv.metadata);
+        meta = `Stadium: ${m.stadiumName} | Matchday: ${m.matchday || 12} | Stage: ${m.stage}`;
+      } catch {}
+    }
+
+    if (format === 'txt') {
+      let content = `STADIUMOS AI DECISION ENGINE EXPORT\n`;
+      content += `Title: ${title}\nDate: ${dateStr}\nContext: ${meta}\n`;
+      content += `==========================================\n\n`;
+
+      messages.forEach(m => {
+        const senderLabel = m.sender === 'user' ? 'USER' : m.sender === 'assistant' ? 'COPILOT' : 'SYSTEM';
+        content += `[${new Date(m.timestamp).toLocaleTimeString()}] ${senderLabel}:\n${m.content}\n\n`;
+      });
+
+      const element = document.createElement("a");
+      const file = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      element.href = URL.createObjectURL(file);
+      element.download = `${title.replace(/[\s\W]+/g, "_")}_export.txt`;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+
+    } else if (format === 'md') {
+      let content = `# StadiumOS AI Decision Engine Export\n\n`;
+      content += `* **Title**: ${title}\n* **Date**: ${dateStr}\n* **Context**: ${meta}\n\n`;
+      content += `---\n\n`;
+
+      messages.forEach(m => {
+        const senderLabel = m.sender === 'user' ? 'User' : m.sender === 'assistant' ? 'Copilot' : 'System';
+        content += `### [${new Date(m.timestamp).toLocaleTimeString()}] ${senderLabel}\n\n${m.content}\n\n`;
+      });
+
+      const element = document.createElement("a");
+      const file = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+      element.href = URL.createObjectURL(file);
+      element.download = `${title.replace(/[\s\W]+/g, "_")}_export.md`;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+
+    } else if (format === 'pdf') {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      doc.setFillColor(12, 18, 32);
+      doc.rect(0, 0, 210, 297, 'F');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(6, 182, 212); // Cyan accent
+      doc.text('STADIUMOS DECISION SYSTEM REPORT', 15, 20);
+
+      doc.setFontSize(10);
+      doc.setTextColor(255, 255, 255);
+      doc.text(`Title: ${title}`, 15, 28);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(148, 163, 184);
+      doc.text(`Export Date: ${dateStr}`, 15, 34);
+      if (meta) {
+        doc.text(`Context: ${meta}`, 15, 39);
+      }
+
+      doc.setDrawColor(30, 41, 59);
+      doc.line(15, 43, 195, 43);
+
+      let currentY = 50;
+      doc.setFontSize(9);
+
+      messages.forEach(m => {
+        if (currentY > 270) {
+          doc.addPage();
+          doc.setFillColor(12, 18, 32);
+          doc.rect(0, 0, 210, 297, 'F');
+          currentY = 20;
+        }
+
+        const senderLabel = m.sender === 'user' ? 'USER' : m.sender === 'assistant' ? 'COPILOT' : 'SYSTEM';
+        const labelColor = m.sender === 'user' ? [14, 165, 233] : m.sender === 'assistant' ? [6, 182, 212] : [244, 63, 94];
+
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(labelColor[0], labelColor[1], labelColor[2]);
+        doc.text(`[${new Date(m.timestamp).toLocaleTimeString()}] ${senderLabel}:`, 15, currentY);
+
+        currentY += 4.5;
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(226, 232, 240);
+
+        const splitText = doc.splitTextToSize(m.content, 175);
+        splitText.forEach((line: string) => {
+          if (currentY > 275) {
+            doc.addPage();
+            doc.setFillColor(12, 18, 32);
+            doc.rect(0, 0, 210, 297, 'F');
+            currentY = 20;
+          }
+          doc.text(line, 15, currentY);
+          currentY += 5;
+        });
+
+        currentY += 4;
+      });
+
+      doc.save(`${title.replace(/[\s\W]+/g, "_")}_export.pdf`);
+    }
+  };
+
   // Parses markdown, actions, confidence cards and multi-step plans
   const formatMessageContent = (content: string, promptText: string) => {
     const lines = content.split('\n');
     
-    // Extracted tags
     let confidence = '';
     let risk = '';
     let improvement = '';
@@ -322,7 +577,6 @@ export default function AIAssistantPage() {
     });
 
     const parsedText = cleanLines.map((line, idx) => {
-      // Bold text replacement (**text**)
       const boldLine = line;
       const boldRegex = /\*\*(.*?)\*\*/g;
       const parts = [];
@@ -394,7 +648,6 @@ export default function AIAssistantPage() {
         );
       }
 
-      // FIFA EXECUTIVE MODE
       if (isFifa) {
         return (
           <div key={key} className="flex flex-wrap gap-2 pt-1">
@@ -419,7 +672,6 @@ export default function AIAssistantPage() {
         );
       }
 
-      // Staff mode direct execution
       return (
         <Button
           key={key}
@@ -433,88 +685,69 @@ export default function AIAssistantPage() {
       );
     };
 
-    const executeAllPlan = async (acts: string[]) => {
-      setIsThinking(true);
-      for (let i = 0; i < THINKING_STEPS.length; i++) {
-        setThinkingIndex(i);
-        await new Promise(r => setTimeout(r, 450));
-      }
-      setIsThinking(false);
-
-      for (const act of acts) {
-        await executeAction(act, promptText);
-        await new Promise(r => setTimeout(r, 300));
-      }
-      showToast('All multi-step AI plan dispatches applied successfully.', 'success');
-    };
+    const hasTelemetry = confidence || risk || improvement || actions.length > 0 || plans.length > 0;
 
     return (
-      <div className="space-y-3.5">
-        <div className="space-y-1">{parsedText}</div>
+      <div className="space-y-3">
+        <div className="space-y-1.5">{parsedText}</div>
+        
+        {hasTelemetry && (
+          <div className="pt-2 border-t border-slate-900/60 mt-2 space-y-2">
+            {/* KPI Telemetry row */}
+            {(confidence || risk || improvement) && (
+              <div className="flex flex-wrap gap-2">
+                {confidence && (
+                  <Badge variant="secondary" className="text-[8.5px] border-slate-805 bg-slate-950/50 text-cyan-400 font-mono">
+                    AI Confidence: {confidence}
+                  </Badge>
+                )}
+                {risk && (
+                  <Badge variant="secondary" className={`text-[8.5px] border-slate-805 bg-slate-950/50 font-mono ${risk.toLowerCase() === 'low' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    Risk: {risk}
+                  </Badge>
+                )}
+                {improvement && (
+                  <Badge variant="secondary" className="text-[8.5px] border-slate-805 bg-slate-950/50 text-cyan-400 font-mono">
+                    Impact: {improvement}
+                  </Badge>
+                )}
+              </div>
+            )}
 
-        {/* Confidence Indicator Card */}
-        {confidence && (
-          <div className="grid grid-cols-3 gap-2 p-3 rounded-xl border border-slate-900 bg-slate-950/60 text-[10px]">
-            <div>
-              <span className="text-slate-500 block font-mono">CONFIDENCE</span>
-              <span className="text-cyan-400 font-black block font-mono text-xs">{confidence}</span>
-            </div>
-            <div>
-              <span className="text-slate-500 block font-mono">RISK PROFILE</span>
-              <span className="text-emerald-400 font-bold block font-mono text-xs">{risk}</span>
-            </div>
-            <div>
-              <span className="text-slate-500 block font-mono">EXPECTED IMPACT</span>
-              <span className="text-white font-bold block truncate">{improvement}</span>
-            </div>
-          </div>
-        )}
+            {/* Standard Actions */}
+            {actions.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {actions.map((act, idx) => actionButton(act, idx))}
+              </div>
+            )}
 
-        {/* Action triggers */}
-        {actions.length > 0 && (
-          <div className="pt-1.5">
-            {actions.map((act, i) => actionButton(act, i))}
-          </div>
-        )}
-
-        {/* Multi-step plans */}
-        {plans.length > 0 && (
-          <div className="p-3 rounded-xl border border-slate-900 bg-[#090e1a]/60 space-y-2 text-xs">
-            <span className="font-bold text-white flex items-center gap-1.5 font-mono text-[10.5px]">
-              <ShieldCheck className="h-4 w-4 text-cyan-400" />
-              INTELLIGENT MULTI-STEP RESPONSE PLAN
-            </span>
-            <div className="space-y-2">
-              {plans.map((p, i) => (
-                <div key={i} className="flex items-center justify-between p-2 rounded bg-slate-950/40 border border-slate-900/60 text-[11px]">
-                  <div className="flex items-center gap-2">
-                    <span className="h-4 w-4 rounded-full bg-slate-900 border border-slate-800 text-[10px] text-cyan-400 flex items-center justify-center font-mono">
-                      {i + 1}
-                    </span>
-                    <span className="text-slate-200 capitalize font-medium">{p.replace('_', ' ')}</span>
-                  </div>
-                  {/* Step Execute trigger (for staff/fifa) */}
-                  {!isVisitor && (
-                    <Button
-                      onClick={() => handleApplyAction(p, `Step ${i+1}: ${p}`)}
-                      size="sm"
-                      className="h-6 text-[9px] px-2 bg-slate-900 hover:bg-[#0f172a] text-cyan-400 border border-slate-800 cursor-pointer"
-                    >
-                      Execute Step
-                    </Button>
-                  )}
+            {/* Multi-step plans */}
+            {plans.length > 0 && (
+              <div className="pt-1.5 space-y-2">
+                <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-wider font-bold text-slate-500 font-mono">
+                  <Terminal className="h-3.5 w-3.5 text-cyan-400" />
+                  <span>Proposed Multi-Step Operational Plan</span>
                 </div>
-              ))}
-            </div>
-            {!isVisitor && (
-              <div className="pt-2 border-t border-slate-900 flex justify-end">
-                <Button
-                  onClick={() => executeAllPlan(plans)}
-                  size="sm"
-                  className="bg-cyan-600 hover:bg-cyan-700 text-white text-[10px] font-bold h-7.5 px-3 rounded-lg cursor-pointer"
-                >
-                  Execute All Steps
-                </Button>
+                <div className="p-3 rounded-lg border border-slate-900 bg-slate-950/40 text-[10px] space-y-2">
+                  <ol className="list-decimal list-inside space-y-1 text-slate-400">
+                    {plans.map((p, idx) => {
+                      let label = p;
+                      if (p === 'OPEN_GATE_4') label = 'Instruct turnstiles override at Gate 4';
+                      else if (p === 'REDIRECT_CROWD') label = 'Dispatch pedestrian route redirection indicators';
+                      else if (p === 'ACTIVATE_ACCESSIBILITY') label = 'Mobilize accessibility volunteer taskforces';
+                      else if (p === 'INCREASE_SHUTTLE') label = 'Escalate shuttle departure frequencies';
+                      return <li key={idx} className="capitalize">{label}</li>;
+                    })}
+                  </ol>
+                  <Button
+                    onClick={() => executeAllPlan(plans, promptText)}
+                    size="sm"
+                    className="w-full bg-cyan-600 hover:bg-cyan-700 text-slate-950 font-black text-[10px] h-7 px-3.5 rounded-lg flex gap-1 items-center justify-center cursor-pointer mt-2"
+                  >
+                    <CheckCircle className="h-3.5 w-3.5 text-slate-950" />
+                    <span>Authorize Complete Multi-Step Plan</span>
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -523,171 +756,345 @@ export default function AIAssistantPage() {
     );
   };
 
-  const quickPrompts = isVisitor ? QUICK_PROMPTS_VISITOR : QUICK_PROMPTS_STAFF;
+  const filteredConvs = conversations.filter(c => 
+    c.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const pinnedChats = filteredConvs.filter(c => pinnedIds.includes(c.id));
+  const recentChats = filteredConvs.filter(c => !pinnedIds.includes(c.id));
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8.5rem)] max-w-5xl mx-auto gap-4 relative">
-      
-      {/* Toast Notification Container */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
-        <AnimatePresence>
-          {toasts.map((toast) => (
-            <motion.div
-              key={toast.id}
-              initial={{ opacity: 0, y: 50, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className={`p-4 rounded-xl border shadow-2xl backdrop-blur-xl pointer-events-auto flex gap-2.5 items-start ${
-                toast.type === 'success'
-                  ? 'bg-emerald-950/75 border-emerald-500/30 text-emerald-200'
-                  : toast.type === 'warning'
-                  ? 'bg-rose-950/75 border-rose-500/30 text-rose-200'
-                  : 'bg-blue-950/75 border-blue-500/30 text-blue-200'
-              }`}
-            >
-              {toast.type === 'success' ? (
-                <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
-              ) : toast.type === 'warning' ? (
-                <AlertTriangle className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
-              ) : (
-                <Info className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
+    <div className="flex flex-col gap-4 h-[calc(100vh-100px)]">
+      {/* Toast notifications */}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`p-3 rounded-lg border shadow-lg text-xs font-semibold flex items-center gap-2 max-w-sm ${
+              t.type === 'success' 
+                ? 'bg-emerald-950/80 border-emerald-500/20 text-emerald-300'
+                : t.type === 'warning'
+                ? 'bg-rose-950/80 border-rose-500/20 text-rose-300'
+                : 'bg-cyan-950/80 border-cyan-500/20 text-cyan-300'
+            }`}
+          >
+            <Info className="h-4 w-4 shrink-0" />
+            <span>{t.message}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Main Grid */}
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 min-h-0">
+        
+        {/* Left Column: Sidebar list & Quick Actions */}
+        <div className="md:col-span-1 flex flex-col gap-4 h-full overflow-hidden">
+          
+          {/* Chat Sessions list */}
+          <Card className="bg-[#080d19]/45 border-slate-900/60 p-4 space-y-3.5 flex flex-col h-[55%]">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-900/50">
+              <div className="flex items-center gap-1.5 text-white font-bold text-xs uppercase tracking-wider font-mono">
+                <Bot className="h-4.5 w-4.5 text-cyan-400" />
+                <span>Chat History</span>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => handleNewChat()}
+                className="bg-cyan-950/40 hover:bg-cyan-900/30 text-cyan-400 hover:text-white border border-cyan-800/40 hover:border-cyan-500/50 h-6 px-2 rounded-lg flex items-center gap-0.5 cursor-pointer text-[9px]"
+              >
+                <Plus className="h-3 w-3" />
+                <span>New</span>
+              </Button>
+            </div>
+
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="absolute left-2 top-2 h-3 w-3 text-slate-500" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search..."
+                className="pl-7 bg-slate-950/60 border-slate-900 focus-visible:ring-cyan-500/50 text-[10px] placeholder:text-slate-650 text-white rounded-lg h-8"
+              />
+            </div>
+
+            {/* Scrollable list */}
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-[11px]">
+              {/* Pinned Chats */}
+              {pinnedChats.length > 0 && (
+                <div className="space-y-1">
+                  <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest block font-mono px-1">📌 Pinned</span>
+                  {pinnedChats.map((c) => (
+                    <div
+                      key={c.id}
+                      onClick={() => handleSelectConversation(c)}
+                      className={`group relative flex items-center justify-between p-2 rounded border transition-all cursor-pointer ${
+                        activeConv?.id === c.id
+                          ? 'bg-cyan-950/20 border-cyan-500/30 text-white'
+                          : 'bg-slate-950/20 border-transparent hover:bg-slate-900/30 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {editingConvId === c.id ? (
+                        <div className="flex items-center gap-1 w-full" onClick={e => e.stopPropagation()}>
+                          <Input
+                            value={renameTitle}
+                            onChange={(e) => setRenameTitle(e.target.value)}
+                            className="bg-slate-950 border-slate-800 text-[10px] h-5 px-1 text-white"
+                            autoFocus
+                          />
+                          <button onClick={() => handleSaveRename(c.id)} className="text-emerald-400 p-0.5 hover:bg-slate-900 rounded"><Check className="h-3 w-3" /></button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="truncate pr-6 font-semibold block">{c.title}</span>
+                          <div className="absolute right-1 top-1.5 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={(e) => togglePinChat(c.id, e)} className="text-cyan-400 p-0.5"><Pin className="h-2.5 w-2.5 fill-cyan-400" /></button>
+                            <button onClick={(e) => handleStartRename(c, e)} className="text-slate-400 p-0.5"><Edit2 className="h-2.5 w-2.5" /></button>
+                            <button onClick={(e) => handleDeleteChat(c.id, e)} className="text-rose-400 p-0.5"><Trash2 className="h-2.5 w-2.5" /></button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
-              <span className="text-xs font-semibold leading-normal">{toast.message}</span>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
 
-      {/* Overview Head */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/25">
-            <Terminal className="h-5 w-5" />
-          </div>
-          <div>
-            <h2 className="text-xl font-extrabold tracking-tight text-white">
-              {isVisitor ? 'AI Fan Companion' : 'AI Decision Engine'}
-            </h2>
-            <p className="text-xs text-slate-400">
-              {isVisitor 
-                ? 'Your smart concierge for venue navigation, food courts and assistance.' 
-                : 'Direct control link. Commands automatically sync with every dashboard.'}
-            </p>
-          </div>
-        </div>
-        <Badge variant="cyan" className="text-[9px] font-mono">
-          {isVisitor ? 'Spectator Companion' : 'AI COMMAND CENTER'}
-        </Badge>
-      </div>
+              {/* Recent Chats */}
+              <div className="space-y-1">
+                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest block font-mono px-1">💬 Recent</span>
+                {recentChats.length === 0 && pinnedChats.length === 0 ? (
+                  <span className="text-[9px] text-slate-600 block text-center py-4">No sessions.</span>
+                ) : (
+                  recentChats.map((c) => (
+                    <div
+                      key={c.id}
+                      onClick={() => handleSelectConversation(c)}
+                      className={`group relative flex items-center justify-between p-2 rounded border transition-all cursor-pointer ${
+                        activeConv?.id === c.id
+                          ? 'bg-cyan-950/20 border-cyan-500/30 text-white'
+                          : 'bg-slate-950/20 border-transparent hover:bg-slate-900/30 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {editingConvId === c.id ? (
+                        <div className="flex items-center gap-1 w-full" onClick={e => e.stopPropagation()}>
+                          <Input
+                            value={renameTitle}
+                            onChange={(e) => setRenameTitle(e.target.value)}
+                            className="bg-slate-950 border-slate-800 text-[10px] h-5 px-1 text-white"
+                            autoFocus
+                          />
+                          <button onClick={() => handleSaveRename(c.id)} className="text-emerald-400 p-0.5 hover:bg-slate-900 rounded"><Check className="h-3 w-3" /></button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="truncate pr-6 font-semibold block">{c.title}</span>
+                          <div className="absolute right-1 top-1.5 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={(e) => togglePinChat(c.id, e)} className="text-slate-500 p-0.5"><Pin className="h-2.5 w-2.5" /></button>
+                            <button onClick={(e) => handleStartRename(c, e)} className="text-slate-400 p-0.5"><Edit2 className="h-2.5 w-2.5" /></button>
+                            <button onClick={(e) => handleDeleteChat(c.id, e)} className="text-rose-400 p-0.5"><Trash2 className="h-2.5 w-2.5" /></button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </Card>
 
-      {/* Main Panel */}
-      <div className="flex-1 grid md:grid-cols-4 gap-4 min-h-0">
-        {/* Left Side: Quick Commands */}
-        <div className="hidden md:flex flex-col gap-3 md:col-span-1">
-          <Card className="bg-[#080d19]/45 border-slate-900/60 flex-1 flex flex-col justify-between">
-            <CardHeader className="p-4">
-              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 font-mono">
+          {/* Quick Actions List (preset queries) */}
+          <Card className="bg-[#080d19]/45 border-slate-900/60 p-4 space-y-3.5 flex flex-col h-[45%] overflow-hidden">
+            <CardHeader className="p-0">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1 font-mono">
                 <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
                 Quick Actions
               </CardTitle>
-              <CardDescription className="text-[10px]">Tap to send preset queries to your AI helper.</CardDescription>
             </CardHeader>
-            <CardContent className="p-4 pt-0 space-y-2.5">
+            <CardContent className="p-0 flex-1 overflow-y-auto space-y-2 pr-1">
               {quickPrompts.map((item, idx) => (
                 <button
                   key={idx}
                   onClick={() => handleQuickPromptClick(item.prompt)}
-                  className="w-full text-left p-3 rounded-lg border border-slate-800 bg-[#070b13]/60 hover:bg-[#0c1322] hover:border-cyan-500/30 text-xs text-slate-300 hover:text-white transition-all duration-200 cursor-pointer"
+                  className="w-full text-left p-2 rounded border border-slate-900 bg-[#070b13]/60 hover:bg-[#0c1322] hover:border-cyan-500/20 transition-all duration-200 cursor-pointer"
                 >
-                  <span className="font-bold text-[11px] text-cyan-400 block mb-1">{item.label}</span>
-                  <span className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed">{item.prompt}</span>
+                  <span className="font-bold text-[10px] text-cyan-400 block mb-0.5">{item.label}</span>
+                  <span className="text-[9px] text-slate-500 line-clamp-1 leading-normal">{item.prompt}</span>
                 </button>
               ))}
             </CardContent>
-            <CardFooter className="p-4 border-t border-slate-900 bg-slate-950/20 text-[10px] text-slate-500 flex items-center gap-1 font-mono">
-              <Bot className="h-3 w-3" />
-              <span>Model: Gemini 1.5 Decision</span>
-            </CardFooter>
           </Card>
         </div>
 
-        {/* Right Side: Chat box */}
-        <Card className="md:col-span-3 flex flex-col min-h-0 border-slate-900/60 bg-[#080d19]/30">
-          <CardHeader className="border-b border-slate-900/60 p-4 flex flex-row items-center justify-between bg-slate-950/15">
+        {/* Right Side: Chat box (3 cols) */}
+        <Card className="md:col-span-3 flex flex-col min-h-0 border-slate-900/60 bg-[#080d19]/30 h-full overflow-hidden">
+          <CardHeader className="border-b border-slate-900/60 p-3.5 flex flex-row items-center justify-between bg-slate-950/20">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-cyan-400 animate-ping shadow" />
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Live Decision Session</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-350 truncate max-w-[200px]">
+                {activeConv ? activeConv.title : 'Live Decision Session'}
+              </span>
             </div>
-            <Badge variant="cyan" className="text-[9px]">Online</Badge>
+            
+            <div className="flex items-center gap-3">
+              {activeConv && messages.length > 0 && (
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleExport('txt')}
+                    className="h-6.5 text-[9px] text-slate-400 hover:text-white px-2 hover:bg-slate-900 rounded-lg cursor-pointer"
+                  >
+                    TXT
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleExport('md')}
+                    className="h-6.5 text-[9px] text-slate-400 hover:text-white px-2 hover:bg-slate-900 rounded-lg cursor-pointer"
+                  >
+                    MD
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleExport('pdf')}
+                    className="h-6.5 text-[9px] text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/15 border border-cyan-900/20 hover:border-cyan-500/20 px-2.5 rounded-lg flex items-center gap-0.5 cursor-pointer font-bold"
+                  >
+                    <Download className="h-3 w-3" />
+                    <span>PDF</span>
+                  </Button>
+                </div>
+              )}
+              <Badge variant="cyan" className="text-[9px] uppercase tracking-wider px-2 shrink-0">ONLINE</Badge>
+            </div>
           </CardHeader>
 
-          {/* Messages Box */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            <AnimatePresence initial={false}>
-              {messages.map((msg) => (
+          {/* Messages Stream Container */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 relative min-h-0">
+            {/* Context restore banner */}
+            <AnimatePresence>
+              {contextAlert && (
                 <motion.div
-                  key={msg.id}
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className={`flex gap-3 max-w-[85%] ${
-                    msg.sender === 'user' 
-                      ? 'ml-auto flex-row-reverse' 
-                      : msg.sender === 'system'
-                      ? 'mx-auto max-w-[95%]'
-                      : 'mr-auto'
-                  }`}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="sticky top-0 z-10 w-full p-2 rounded-lg bg-cyan-950/85 border border-cyan-500/20 text-cyan-400 text-[10px] font-semibold flex items-center gap-1.5 backdrop-blur shadow"
                 >
-                  {/* Bubble Icon */}
-                  {msg.sender !== 'system' && (
-                    <div className={`h-8 w-8 rounded-full shrink-0 flex items-center justify-center border ${
-                      msg.sender === 'user' 
-                        ? 'bg-blue-600 border-blue-500 text-white' 
-                        : 'bg-slate-900 border-slate-800 text-cyan-400'
-                    }`}>
-                      {msg.sender === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-                    </div>
-                  )}
-
-                  {/* Bubble Content */}
-                  <div className={`rounded-xl px-4 py-3 border shadow-sm ${
-                    msg.sender === 'user'
-                      ? 'bg-[#0f182e] border-blue-900/30 text-slate-100'
-                      : msg.sender === 'system'
-                      ? 'bg-[#052c21]/45 border-emerald-900/40 text-emerald-300 w-full text-center'
-                      : 'bg-[#0d1324] border-slate-800/80 text-slate-200'
-                  }`}>
-                    <div className="space-y-1">{formatMessageContent(msg.content, msg.sender === 'user' ? msg.content : '')}</div>
-                    <span className="block text-[8px] text-slate-500 text-right mt-1.5 font-mono">
-                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
+                  <Sparkles className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+                  <span>{contextAlert}</span>
                 </motion.div>
-              ))}
+              )}
             </AnimatePresence>
 
-            {/* AI thinking experience layout loader */}
-            {isThinking && (
-              <div className="flex gap-3 max-w-[80%] mr-auto items-center">
-                <div className="h-8 w-8 rounded-full bg-slate-900 border border-slate-800 text-cyan-400 flex items-center justify-center">
-                  <Bot className="h-4 w-4 animate-bounce" />
+            {!activeConv ? (
+              <div className="flex-1 flex flex-col justify-center items-center text-center space-y-6 my-auto min-h-[45vh]">
+                <div className="h-10 w-10 rounded-full bg-cyan-950/15 border border-cyan-900/30 flex items-center justify-center text-cyan-400 shrink-0">
+                  <Bot className="h-5 w-5 animate-pulse" />
                 </div>
-                <div className="rounded-xl px-4 py-3 bg-[#0d1324] border border-slate-800 text-slate-400 text-xs flex gap-2 items-center">
-                  <div className="flex space-x-1 shrink-0">
-                    <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:-0.3s]" />
-                    <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:-0.15s]" />
-                    <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-bounce" />
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-350 font-bold uppercase tracking-wider font-mono">StadiumOS Decision Portal</p>
+                  <p className="text-[10px] text-slate-500 max-w-xs leading-relaxed mx-auto">
+                    Select a previous session from the history sidebar or create a new session to begin auditing.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => handleNewChat()}
+                  className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold h-9 px-6 rounded-lg text-xs"
+                >
+                  Start New Session
+                </Button>
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="flex-1 flex flex-col justify-center items-center text-center space-y-4 my-auto min-h-[45vh]">
+                <div className="h-9 w-9 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-cyan-400">
+                  <Bot className="h-4.5 w-4.5 animate-pulse" />
+                </div>
+                <p className="text-xs text-slate-300 font-semibold leading-relaxed max-w-[260px] mx-auto">
+                  New operations chat initialized. Analyzing {selectedStadium.name}.
+                </p>
+                <div className="w-full pt-4 border-t border-slate-900/40 max-w-sm text-left">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5 font-mono px-1">
+                    Suggested Telemetry Queries
+                  </span>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {quickPrompts.slice(0, 3).map((item, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleSendMessage(item.prompt)}
+                        className="text-[9.5px] text-cyan-300 bg-cyan-950/10 hover:bg-cyan-950/30 border border-slate-900 hover:border-cyan-800/30 px-2.5 py-1.5 rounded-lg transition text-left cursor-pointer"
+                      >
+                        ✦ {item.prompt}
+                      </button>
+                    ))}
                   </div>
-                  <span className="font-mono text-[10.5px]">{THINKING_STEPS[thinkingIndex]}</span>
                 </div>
               </div>
+            ) : (
+              <div className="space-y-4 min-h-0 flex-1">
+                <AnimatePresence initial={false}>
+                  {messages.map((msg) => (
+                    <motion.div
+                      key={msg.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.18 }}
+                      className={`flex gap-3 max-w-[85%] ${
+                        msg.sender === 'user' 
+                          ? 'ml-auto flex-row-reverse' 
+                          : msg.sender === 'system'
+                          ? 'mx-auto max-w-[95%]'
+                          : 'mr-auto'
+                      }`}
+                    >
+                      {msg.sender !== 'system' && (
+                        <div className={`h-8 w-8 rounded-full shrink-0 flex items-center justify-center border ${
+                          msg.sender === 'user' 
+                            ? 'bg-blue-650 border-blue-500/20 text-white' 
+                            : 'bg-slate-900 border-slate-800 text-cyan-400'
+                        }`}>
+                          {msg.sender === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+                        </div>
+                      )}
+
+                      <div className={`rounded-xl px-3.5 py-2.5 border shadow-sm ${
+                        msg.sender === 'user'
+                          ? 'bg-[#0f182e] border-blue-900/30 text-slate-100'
+                          : msg.sender === 'system'
+                          ? 'bg-[#052c21]/45 border-emerald-900/40 text-emerald-300 w-full text-center'
+                          : 'bg-[#0d1324] border-slate-800/80 text-slate-200'
+                      }`}>
+                        <div className="space-y-1">{formatMessageContent(msg.content, msg.sender === 'user' ? msg.content : '')}</div>
+                        <span className="block text-[8px] text-slate-500 text-right mt-1.5 font-mono">
+                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+
+                {isThinking && (
+                  <div className="flex gap-3 max-w-[80%] mr-auto items-center">
+                    <div className="h-8 w-8 rounded-full bg-slate-900 border border-slate-800 text-cyan-400 flex items-center justify-center">
+                      <Bot className="h-4 w-4 animate-bounce" />
+                    </div>
+                    <div className="rounded-xl px-4 py-2.5 bg-[#0d1324] border border-slate-800 text-slate-400 text-xs flex gap-2 items-center">
+                      <div className="flex space-x-1 shrink-0">
+                        <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:-0.3s]" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:-0.15s]" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-bounce" />
+                      </div>
+                      <span className="font-mono text-[10px] text-slate-500">{THINKING_STEPS[thinkingIndex]}</span>
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
             )}
-            <div ref={chatEndRef} />
           </div>
 
-          {/* Form input */}
-          <div className="p-4 border-t border-slate-900/60 bg-slate-950/20">
+          {/* Form input bar */}
+          <div className="p-3.5 border-t border-slate-900/60 bg-slate-950/20 shrink-0">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -696,13 +1103,19 @@ export default function AIAssistantPage() {
               className="flex gap-2"
             >
               <Input
-                placeholder={isVisitor ? "Ask: Where is my seat? / Restrooms / Tacos / Lost child help..." : "Ask AI Copilot for crowd reroutes, transit delays, safety checks..."}
+                placeholder={
+                  !activeConv 
+                    ? "Select or start a chat session..."
+                    : isVisitor 
+                    ? "Ask: Where is my seat? / Restrooms / Tacos / Lost child help..." 
+                    : "Ask AI Copilot for crowd reroutes, transit delays, safety checks..."
+                }
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                disabled={isThinking}
-                className="flex-1 bg-[#050912] placeholder-slate-600 text-xs"
+                disabled={isThinking || !activeConv}
+                className="flex-1 bg-[#050912] border-slate-900 focus-visible:ring-cyan-500/40 placeholder-slate-650 text-xs text-white"
               />
-              <Button type="submit" size="icon" disabled={isThinking || !input.trim()} className="cursor-pointer">
+              <Button type="submit" size="icon" disabled={isThinking || !input.trim() || !activeConv} className="cursor-pointer bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg">
                 <Send className="h-4 w-4" />
               </Button>
             </form>

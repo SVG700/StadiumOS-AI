@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { 
   CrowdDensity, 
   ActiveVisitors, 
@@ -386,5 +387,331 @@ export class DatabaseService {
     });
     this.setLocal('stadium_crowd_density', updated);
     return true;
+  }
+
+  // --- ACCESS REQUESTS WORKFLOW ---
+  static async getAccessRequests(): Promise<any[]> {
+    if (isSupabaseConfigured) {
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('access_requests')
+            .select('*')
+            .order('created_at', { ascending: false });
+          if (!error && data) return data;
+        } catch (err) {
+          console.warn('Supabase access_requests query failed, using local fallback:', err);
+        }
+      }
+    }
+    return this.getLocal<any[]>('stadium_access_requests', []);
+  }
+
+  static async addAccessRequest(req: { name: string; email: string; organization: string; requested_role: string; reason: string }): Promise<any> {
+    const newReq = {
+      ...req,
+      id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `req-${Date.now()}`,
+      status: 'Pending',
+      created_at: new Date().toISOString(),
+    };
+
+    if (isSupabaseConfigured) {
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        try {
+          const { data, error } = await supabase.from('access_requests').insert(newReq).select().single();
+          if (!error && data) return data;
+        } catch (err) {
+          console.warn('Supabase access_requests insert failed, using local fallback:', err);
+        }
+      }
+    }
+
+    const current = this.getLocal<any[]>('stadium_access_requests', []);
+    const updated = [newReq, ...current];
+    this.setLocal('stadium_access_requests', updated);
+    return newReq;
+  }
+
+  static async updateUserRoleByEmail(email: string, role: string): Promise<boolean> {
+    if (isSupabaseConfigured) {
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        try {
+          const { error } = await supabase
+            .from('profiles')
+            .update({ role })
+            .eq('email', email);
+          if (!error) return true;
+        } catch (err) {
+          console.warn('Failed to update profile role in Supabase:', err);
+        }
+      }
+    }
+
+    const usersStr = localStorage.getItem('stadium_os_demo_users') || '[]';
+    let users = JSON.parse(usersStr);
+    let updated = false;
+    users = users.map((u: any) => {
+      if (u.email === email) {
+        updated = true;
+        return { ...u, role };
+      }
+      return u;
+    });
+    if (updated) {
+      localStorage.setItem('stadium_os_demo_users', JSON.stringify(users));
+    }
+
+    const currentDemoUserStr = localStorage.getItem('stadium_os_demo_user');
+    if (currentDemoUserStr) {
+      const currentDemoUser = JSON.parse(currentDemoUserStr);
+      if (currentDemoUser.email === email) {
+        currentDemoUser.role = role;
+        localStorage.setItem('stadium_os_demo_user', JSON.stringify(currentDemoUser));
+      }
+    }
+
+    return true;
+  }
+
+  static async updateAccessRequestStatus(id: string, status: 'Approved' | 'Rejected'): Promise<boolean> {
+    let email = '';
+    let requestedRole = '';
+
+    if (isSupabaseConfigured) {
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        try {
+          const { data: request } = await supabase
+            .from('access_requests')
+            .select('email, requested_role')
+            .eq('id', id)
+            .single();
+          
+          if (request) {
+            email = request.email;
+            requestedRole = request.requested_role;
+          }
+
+          const { error } = await supabase
+            .from('access_requests')
+            .update({ status })
+            .eq('id', id);
+          
+          if (error) console.warn('Supabase access_requests update status error:', error);
+        } catch (err) {
+          console.warn('Supabase access_requests update status query failed:', err);
+        }
+      }
+    }
+
+    const current = this.getLocal<any[]>('stadium_access_requests', []);
+    const request = current.find(r => r.id === id);
+    if (request) {
+      email = request.email;
+      requestedRole = request.requested_role;
+    }
+    const updated = current.map(r => r.id === id ? { ...r, status } : r);
+    this.setLocal('stadium_access_requests', updated);
+
+    if (status === 'Approved' && email && requestedRole) {
+      let mappedRole = 'visitor';
+      const roleLower = requestedRole.toLowerCase();
+      if (roleLower === 'fifa executive' || roleLower === 'fifa') {
+        mappedRole = 'fifa';
+      } else if (roleLower === 'staff' || roleLower === 'volunteer' || roleLower === 'operations') {
+        mappedRole = 'staff';
+      }
+      await this.updateUserRoleByEmail(email, mappedRole);
+    }
+
+    return true;
+  }
+
+  // --- PERSISTENT AI CHAT HISTORY ---
+  static async getConversations(userId: string, role: string): Promise<any[]> {
+    if (isSupabaseConfigured) {
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('conversations')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('role', role)
+            .order('updated_at', { ascending: false });
+          if (!error && data) return data;
+        } catch (err) {
+          console.warn('Supabase conversations query failed, using local fallback:', err);
+        }
+      }
+    }
+    const all = this.getLocal<any[]>('stadium_conversations', []);
+    return all.filter(c => c.user_id === userId && c.role === role);
+  }
+
+  static async createConversation(userId: string, role: 'visitor' | 'staff' | 'fifa', title: string, metadata: any): Promise<any> {
+    const newConv = {
+      id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `conv-${Date.now()}`,
+      user_id: userId,
+      role,
+      title,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      metadata: JSON.stringify(metadata)
+    };
+
+    if (isSupabaseConfigured) {
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        try {
+          const { data, error } = await supabase.from('conversations').insert(newConv).select().single();
+          if (!error && data) return data;
+        } catch (err) {
+          console.warn('Supabase conversation create failed, using local fallback:', err);
+        }
+      }
+    }
+
+    const current = this.getLocal<any[]>('stadium_conversations', []);
+    const updated = [newConv, ...current];
+    this.setLocal('stadium_conversations', updated);
+    return newConv;
+  }
+
+  static async updateConversationTitle(id: string, title: string): Promise<boolean> {
+    if (isSupabaseConfigured) {
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        try {
+          const { error } = await supabase
+            .from('conversations')
+            .update({ title, updated_at: new Date().toISOString() })
+            .eq('id', id);
+          if (!error) return true;
+        } catch (err) {
+          console.warn('Supabase conversation update title failed:', err);
+        }
+      }
+    }
+
+    const current = this.getLocal<any[]>('stadium_conversations', []);
+    const updated = current.map(c => c.id === id ? { ...c, title, updated_at: new Date().toISOString() } : c);
+    this.setLocal('stadium_conversations', updated);
+    return true;
+  }
+
+  static async deleteConversation(id: string): Promise<boolean> {
+    if (isSupabaseConfigured) {
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        try {
+          await supabase.from('messages').delete().eq('conversation_id', id);
+          const { error } = await supabase.from('conversations').delete().eq('id', id);
+          if (!error) return true;
+        } catch (err) {
+          console.warn('Supabase conversation delete failed:', err);
+        }
+      }
+    }
+
+    const current = this.getLocal<any[]>('stadium_conversations', []);
+    const updated = current.filter(c => c.id !== id);
+    this.setLocal('stadium_conversations', updated);
+
+    const msgs = this.getLocal<any[]>('stadium_messages', []);
+    const updatedMsgs = msgs.filter(m => m.conversation_id !== id);
+    this.setLocal('stadium_messages', updatedMsgs);
+
+    return true;
+  }
+
+  static async getMessages(conversationId: string): Promise<any[]> {
+    if (isSupabaseConfigured) {
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('messages')
+            .select('*')
+            .eq('conversation_id', conversationId)
+            .order('timestamp', { ascending: true });
+          if (!error && data) {
+            return data.map((m: any) => ({
+              id: m.id,
+              sender: m.role as 'user' | 'assistant' | 'system',
+              content: m.content,
+              timestamp: m.timestamp
+            }));
+          }
+        } catch (err) {
+          console.warn('Supabase messages read failed, using local fallback:', err);
+        }
+      }
+    }
+    const all = this.getLocal<any[]>('stadium_messages', []);
+    return all
+      .filter(m => m.conversation_id === conversationId)
+      .map(m => ({
+        id: m.id,
+        sender: m.sender,
+        content: m.content,
+        timestamp: m.timestamp
+      }));
+  }
+
+  static async addMessage(conversationId: string, sender: 'user' | 'assistant' | 'system', content: string): Promise<any> {
+    const newMsg = {
+      id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `msg-${Date.now()}-${Math.random().toString(36).substring(2,6)}`,
+      conversation_id: conversationId,
+      sender,
+      role: sender,
+      content,
+      timestamp: new Date().toISOString()
+    };
+
+    if (isSupabaseConfigured) {
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        try {
+          const dbMsg = {
+            id: newMsg.id,
+            conversation_id: newMsg.conversation_id,
+            role: newMsg.role,
+            content: newMsg.content,
+            timestamp: newMsg.timestamp
+          };
+          const { error } = await supabase.from('messages').insert(dbMsg);
+          await supabase.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversationId);
+          if (!error) {
+            return {
+              id: newMsg.id,
+              sender,
+              content,
+              timestamp: newMsg.timestamp
+            };
+          }
+        } catch (err) {
+          console.warn('Supabase message insert failed, using local fallback:', err);
+        }
+      }
+    }
+
+    const current = this.getLocal<any[]>('stadium_messages', []);
+    current.push(newMsg);
+    this.setLocal('stadium_messages', current);
+
+    const convs = this.getLocal<any[]>('stadium_conversations', []);
+    const updatedConvs = convs.map(c => c.id === conversationId ? { ...c, updated_at: new Date().toISOString() } : c);
+    this.setLocal('stadium_conversations', updatedConvs);
+
+    return {
+      id: newMsg.id,
+      sender,
+      content,
+      timestamp: newMsg.timestamp
+    };
   }
 }

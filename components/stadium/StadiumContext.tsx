@@ -72,7 +72,7 @@ export interface StadiumPrediction {
   reasoning: string[];
 }
 
-export type MatchPhase = 'pre-match' | 'kickoff' | 'first-half' | 'halftime' | 'second-half' | 'full-time' | 'exit-phase' | 'venue-closed';
+export type MatchPhase = 'pre-match' | 'kickoff' | 'first-half' | 'halftime' | 'second-half' | 'full-time' | 'exit-phase' | 'venue-closed' | 'penalties';
 
 export interface SimulatedIncident {
   id: string;
@@ -824,40 +824,165 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const changeMatchPhase = (phase: MatchPhase) => {
     let updatedCrowd = [...crowdDensity];
     let updatedTransit = [...transport];
-    let densityDelta = 0;
-    let occupancyLevel: 'low' | 'medium' | 'high' = 'medium';
+    let updatedVisitors = { ...visitors };
+    const updatedMatch = { ...selectedStadium.match };
+    const updatedSustainability = { ...sustainability };
 
-    if (phase === 'kickoff') {
-      densityDelta = 85;
-      occupancyLevel = 'high';
-      triggerLog(`Match kickoff whistle blown at ${selectedStadium.name}. Gates closing soon.`, 'operational');
+    if (phase === 'pre-match') {
+      updatedVisitors = { total: 43500, fans: 42000, staff: 1200, vip: 300 };
+      updatedMatch.attendance = 43500;
+      updatedMatch.securityLevel = 'Normal';
+      updatedMatch.medicalStatus = 'Ready';
+      updatedMatch.parkingOccupancy = 65;
+      
+      // Gates open, concourses low
+      updatedCrowd = [
+        { zone: 'Zone A (Gate 1-3)', density: 40, capacity: 15000, currentCount: 6000, status: 'moderate' },
+        { zone: 'Zone B (Gate 4-6)', density: 35, capacity: 15000, currentCount: 5250, status: 'low' },
+        { zone: 'Zone C (Concourse North)', density: 20, capacity: 8000, currentCount: 1600, status: 'low' },
+        { zone: 'Zone D (Concourse South)', density: 15, capacity: 8000, currentCount: 1200, status: 'low' },
+        { zone: 'Zone E (VIP Lounge)', density: 10, capacity: 2000, currentCount: 200, status: 'low' },
+        { zone: 'Zone F (Press Box)', density: 10, capacity: 1000, currentCount: 100, status: 'low' },
+      ];
+
+      updatedTransit = updatedTransit.map(t => ({
+        ...t,
+        status: 'on-time',
+        etaMinutes: 3,
+        occupancy: 'medium'
+      }));
+
+      triggerLog(`Pre-match phase initialized at ${selectedStadium.name}. Gates open, security normal, medical calls low.`, 'operational');
+      triggerNotif(`Spectator ingress underway: attendance rising. Transit operating normally.`, 'transport');
+
+    } else if (phase === 'first-half' || phase === 'kickoff') {
+      updatedVisitors = { total: 68420, fans: 65120, staff: 2800, vip: 500 };
+      updatedMatch.attendance = 68420;
+      updatedMatch.securityLevel = 'Normal';
+      updatedMatch.medicalStatus = 'Ready';
+      updatedMatch.parkingOccupancy = 83;
+
+      // Concourses active, gates low
+      updatedCrowd = [
+        { zone: 'Zone A (Gate 1-3)', density: 15, capacity: 15000, currentCount: 2250, status: 'low' },
+        { zone: 'Zone B (Gate 4-6)', density: 10, capacity: 15000, currentCount: 1500, status: 'low' },
+        { zone: 'Zone C (Concourse North)', density: 75, capacity: 8000, currentCount: 6000, status: 'high' },
+        { zone: 'Zone D (Concourse South)', density: 60, capacity: 8000, currentCount: 4800, status: 'moderate' },
+        { zone: 'Zone E (VIP Lounge)', density: 45, capacity: 2000, currentCount: 900, status: 'moderate' },
+        { zone: 'Zone F (Press Box)', density: 85, capacity: 1000, currentCount: 850, status: 'high' },
+      ];
+
+      triggerLog(`Match kickoff whistle blown at ${selectedStadium.name}. Attendance reached full capacity.`, 'operational');
+      triggerNotif(`In-seat crowd density stabilized. Concessions showing initial food demand.`, 'operational');
+
     } else if (phase === 'halftime') {
-      densityDelta = 75;
-      occupancyLevel = 'medium';
-      triggerLog(`Halftime whistle. High concession loop traffic detected at ${selectedStadium.name}.`, 'operational');
-    } else if (phase === 'full-time') {
-      densityDelta = 35;
-      occupancyLevel = 'high';
-      triggerLog(`Full-time! Dispatching additional shuttle express units to transit hub.`, 'transport');
-    }
+      updatedVisitors = { total: 68420, fans: 65120, staff: 2800, vip: 500 };
+      updatedMatch.attendance = 68420;
+      updatedMatch.securityLevel = 'Normal';
+      updatedMatch.medicalStatus = 'Ready';
 
-    if (updatedCrowd.length > 0) {
-      updatedCrowd = updatedCrowd.map(c => {
-        if (c.zone.includes('Gate')) {
-          return { ...c, density: Math.max(10, Math.min(100, densityDelta + Math.floor(Math.random() * 10 - 5))) };
+      // Spikes in restrooms/concessions
+      updatedCrowd = [
+        { zone: 'Zone A (Gate 1-3)', density: 12, capacity: 15000, currentCount: 1800, status: 'low' },
+        { zone: 'Zone B (Gate 4-6)', density: 10, capacity: 15000, currentCount: 1500, status: 'low' },
+        { zone: 'Zone C (Concourse North)', density: 95, capacity: 8000, currentCount: 7600, status: 'critical' },
+        { zone: 'Zone D (Concourse South)', density: 90, capacity: 8000, currentCount: 7200, status: 'critical' },
+        { zone: 'Zone E (VIP Lounge)', density: 70, capacity: 2000, currentCount: 1400, status: 'high' },
+        { zone: 'Zone F (Press Box)', density: 75, capacity: 1000, currentCount: 750, status: 'high' },
+      ];
+
+      updatedSustainability.wasteRecycledKg += 370;
+
+      addTask({ title: 'Deploy extra janitorial team to North Restrooms', assignee: 'Cleaning Crew 4', priority: 'medium', location: 'Concourse North' });
+      addTask({ title: 'Manage concession queue bottlenecks', assignee: 'Volunteer Supervisor', priority: 'low', location: 'Section 110 Concession' });
+
+      triggerLog(`Halftime phase active. Restroom and concession queues spiked. Cleaning requests increased.`, 'operational');
+      triggerNotif(`Concourse density critical. Recycling bins emptied; waste diversion numbers increased.`, 'operational');
+
+    } else if (phase === 'second-half') {
+      updatedVisitors = { total: 68420, fans: 65120, staff: 2800, vip: 500 };
+      updatedMatch.attendance = 68420;
+      updatedMatch.securityLevel = 'Normal';
+      updatedMatch.medicalStatus = 'Ready';
+
+      // Stabilized crowd in seats
+      updatedCrowd = [
+        { zone: 'Zone A (Gate 1-3)', density: 10, capacity: 15000, currentCount: 1500, status: 'low' },
+        { zone: 'Zone B (Gate 4-6)', density: 8, capacity: 15000, currentCount: 1200, status: 'low' },
+        { zone: 'Zone C (Concourse North)', density: 50, capacity: 8000, currentCount: 4000, status: 'moderate' },
+        { zone: 'Zone D (Concourse South)', density: 45, capacity: 8000, currentCount: 3600, status: 'moderate' },
+        { zone: 'Zone E (VIP Lounge)', density: 30, capacity: 2000, currentCount: 600, status: 'low' },
+        { zone: 'Zone F (Press Box)', density: 90, capacity: 1000, currentCount: 900, status: 'high' },
+      ];
+
+      triggerLog(`Second half underway. Spectators returned to seats; concourse wait times normalized.`, 'operational');
+      triggerNotif(`Medical incident dispatch rate reduced. Volunteers preparing for egress.`, 'medical');
+
+    } else if (phase === 'full-time' || phase === 'exit-phase') {
+      updatedVisitors = { total: 54000, fans: 51000, staff: 2600, vip: 400 };
+      updatedMatch.attendance = 54000;
+      updatedMatch.securityLevel = 'Normal';
+      updatedMatch.medicalStatus = 'Ready';
+      updatedMatch.parkingOccupancy = 95;
+
+      // Heavy exit gate traffic
+      updatedCrowd = [
+        { zone: 'Zone A (Gate 1-3)', density: 95, capacity: 15000, currentCount: 14250, status: 'critical' },
+        { zone: 'Zone B (Gate 4-6)', density: 90, capacity: 15000, currentCount: 13500, status: 'critical' },
+        { zone: 'Zone C (Concourse North)', density: 80, capacity: 8000, currentCount: 6400, status: 'high' },
+        { zone: 'Zone D (Concourse South)', density: 78, capacity: 8000, currentCount: 6240, status: 'high' },
+        { zone: 'Zone E (VIP Lounge)', density: 25, capacity: 2000, currentCount: 500, status: 'low' },
+        { zone: 'Zone F (Press Box)', density: 15, capacity: 1000, currentCount: 150, status: 'low' },
+      ];
+
+      // Metro delay
+      updatedTransit = updatedTransit.map(t => {
+        if (t.mode === 'metro') {
+          return {
+            ...t,
+            status: 'delayed',
+            etaMinutes: 18,
+            delayReason: 'Spectator egress peak volume',
+            occupancy: 'high'
+          };
         }
-        return c;
+        return t;
       });
-    }
 
-    if (updatedTransit.length > 0) {
-      updatedTransit = updatedTransit.map(t => ({ ...t, occupancy: occupancyLevel }));
+      addTask({ title: 'Conduct post-match sanitization sweep', assignee: 'Janitorial Force', priority: 'low', location: 'Full Venue' });
+
+      triggerLog(`Full-time egress active. High exit congestion at main gates. metro delays reported.`, 'transport');
+      triggerNotif(`Spectators departing. Cleaning operations activated. Metro shuttle increased.`, 'transport');
+
+    } else if (phase === 'penalties') {
+      updatedVisitors = { total: 68420, fans: 65120, staff: 2800, vip: 500 };
+      updatedMatch.attendance = 68420;
+      updatedMatch.securityLevel = 'Elevated';
+      updatedMatch.medicalStatus = 'Busy';
+
+      // Crowd in stadium bowl (very low concourse density)
+      updatedCrowd = [
+        { zone: 'Zone A (Gate 1-3)', density: 8, capacity: 15000, currentCount: 1200, status: 'low' },
+        { zone: 'Zone B (Gate 4-6)', density: 5, capacity: 15000, currentCount: 750, status: 'low' },
+        { zone: 'Zone C (Concourse North)', density: 35, capacity: 8000, currentCount: 2800, status: 'low' },
+        { zone: 'Zone D (Concourse South)', density: 30, capacity: 8000, currentCount: 2400, status: 'low' },
+        { zone: 'Zone E (VIP Lounge)', density: 90, capacity: 2000, currentCount: 1800, status: 'high' },
+        { zone: 'Zone F (Press Box)', density: 95, capacity: 1000, currentCount: 950, status: 'critical' },
+      ];
+
+      triggerLog(`Match entering Penalty Shootout! Crowd emotion high. Police stand-by active.`, 'security');
+      triggerNotif(`Security Level raised to ELEVATED. Medical readiness raised to MAXIMUM.`, 'security');
+    } else {
+      triggerLog(`Matchday phase shifted to: ${phase.toUpperCase()}`, 'operational');
     }
 
     updateActiveStadium({
       matchPhase: phase,
       crowdDensity: updatedCrowd,
-      transport: updatedTransit
+      transport: updatedTransit,
+      visitors: updatedVisitors,
+      match: updatedMatch,
+      sustainability: updatedSustainability
     });
 
     triggerNotif(`Matchday phase shifted to: ${phase.toUpperCase()} at ${selectedStadium.city}`, 'operational');
