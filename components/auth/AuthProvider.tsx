@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { getSupabaseBrowserClient, isSupabaseConfigured } from '@/lib/supabase/client';
 import { UserProfile } from '@/types';
@@ -13,6 +13,8 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<{ success: boolean }>;
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
+  updateProfile: (updates: { name?: string; avatarUrl?: string; phoneNumber?: string; preferredLanguage?: string; email?: string }) => Promise<{ success: boolean; error?: string }>;
+  showToast: (message: string, description?: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
 }
 
 interface DemoUser extends UserProfile {
@@ -73,6 +75,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 name: profile.name || 'Staff Member',
                 role: mappedRole,
                 createdAt: profile.created_at || new Date().toISOString(),
+                avatarUrl: profile.avatar_url,
+                phoneNumber: profile.phone_number,
+                preferredLanguage: profile.preferred_language,
               });
             } else {
               // Fallback if profile row is missing
@@ -82,6 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 name: session.user.user_metadata?.name || 'Staff Member',
                 role: mappedRole,
                 createdAt: session.user.created_at || new Date().toISOString(),
+                avatarUrl: session.user.user_metadata?.avatarUrl,
               });
             }
           } else {
@@ -106,6 +112,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 name: profile?.name || session.user.user_metadata?.name || 'Staff Member',
                 role: mappedRole,
                 createdAt: profile?.created_at || session.user.created_at || new Date().toISOString(),
+                avatarUrl: profile?.avatar_url || session.user.user_metadata?.avatarUrl,
+                phoneNumber: profile?.phone_number,
+                preferredLanguage: profile?.preferred_language,
               });
             } else {
               setUser(null);
@@ -456,6 +465,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
+  const updateProfile = async (updates: { 
+    name?: string; 
+    avatarUrl?: string; 
+    phoneNumber?: string; 
+    preferredLanguage?: string;
+    email?: string;
+  }): Promise<{ success: boolean; error?: string }> => {
+    if (!user) return { success: false, error: 'Not authenticated' };
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        if (updates.email && updates.email !== user.email) {
+          const { error } = await supabase.auth.updateUser({ email: updates.email });
+          if (error) return { success: false, error: error.message };
+        }
+
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            name: updates.name,
+            avatar_url: updates.avatarUrl,
+            phone_number: updates.phoneNumber,
+            preferred_language: updates.preferredLanguage,
+          })
+          .eq('id', user.id);
+
+        if (profileError) return { success: false, error: profileError.message };
+
+        await supabase.auth.updateUser({
+          data: { 
+            name: updates.name,
+            avatarUrl: updates.avatarUrl,
+          }
+        }).catch(() => {});
+
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Supabase profile update failed' };
+      }
+    }
+
+    const updatedUser = {
+      ...user,
+      name: updates.name ?? user.name,
+      avatarUrl: updates.avatarUrl ?? user.avatarUrl,
+      phoneNumber: updates.phoneNumber ?? user.phoneNumber,
+      preferredLanguage: updates.preferredLanguage ?? user.preferredLanguage,
+    };
+
+    setUser(updatedUser);
+    localStorage.setItem('stadium_os_demo_user', JSON.stringify(updatedUser));
+
+    const usersStr = localStorage.getItem('stadium_os_demo_users') || '[]';
+    try {
+      const users = JSON.parse(usersStr);
+      const updatedUsers = users.map((u: DemoUser) => u.id === user.id ? { ...u, ...updates } : u);
+      localStorage.setItem('stadium_os_demo_users', JSON.stringify(updatedUsers));
+    } catch (e) {
+      console.error(e);
+    }
+
+    return { success: true };
+  };
+
+  const [toasts, setToasts] = useState<{ id: string; message: string; description?: string; type: 'success' | 'info' | 'warning' | 'error' }[]>([]);
+  
+  const showToast = useCallback((message: string, description?: string, type: 'success' | 'info' | 'warning' | 'error' = 'success') => {
+    const id = `toast-${Date.now()}-${Math.random()}`;
+    setToasts(prev => [...prev, { id, message, description, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4500);
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -466,9 +548,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signOut,
         resetPassword,
+        updateProfile,
+        showToast,
       }}
     >
       {children}
+      <div className="fixed bottom-4 right-4 z-[9999] space-y-2 pointer-events-none">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`p-4 rounded-xl border shadow-xl flex gap-3 max-w-sm pointer-events-auto backdrop-blur-md transition-all duration-300 ${
+              t.type === 'success' 
+                ? 'bg-emerald-950/90 border-emerald-500/30 text-emerald-250 shadow-emerald-950/20'
+                : t.type === 'warning'
+                ? 'bg-amber-950/90 border-amber-500/30 text-amber-250 shadow-amber-950/20'
+                : t.type === 'error'
+                ? 'bg-red-950/90 border-red-500/30 text-red-250 shadow-red-950/20'
+                : 'bg-cyan-950/90 border-cyan-500/30 text-cyan-250 shadow-cyan-950/20'
+            }`}
+            style={{
+              animation: 'slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+            }}
+          >
+            <span className="text-base shrink-0 select-none">
+              {t.type === 'success' ? '✓' : t.type === 'warning' ? '⚠' : t.type === 'error' ? '✗' : 'ℹ'}
+            </span>
+            <div className="space-y-0.5 text-left">
+              <span className="font-bold text-xs block leading-tight text-white">{t.message}</span>
+              {t.description && (
+                <p className="text-[10px] text-slate-350 leading-relaxed font-normal mt-0.5">{t.description}</p>
+              )}
+            </div>
+          </div>
+        ))}
+        <style dangerouslySetInnerHTML={{__html: `
+          @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+          }
+        `}} />
+      </div>
     </AuthContext.Provider>
   );
 }

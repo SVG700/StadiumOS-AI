@@ -1,52 +1,23 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
 import { UserProfile } from '@/types';
 import { Shield, Info } from 'lucide-react';
 
-const ROLE_OPTIONS = [
-  { value: 'visitor', label: 'Visitor / Fan (Visitor Portal)' },
-  { value: 'staff', label: 'Stadium Operations Staff' },
-  { value: 'fifa', label: 'FIFA Board Member (FIFA Executive)' },
-  { value: 'organizer', label: 'Stadium Organizer / Coordinator' },
-  { value: 'security', label: 'Security & Safety Patrol' },
-  { value: 'medical', label: 'Emergency Medical Staff' },
-  { value: 'volunteer', label: 'Volunteer Force' },
-  { value: 'accessibility', label: 'Accessibility Support Agent' },
-  { value: 'transport', label: 'Transportation & Logistics' },
-  { value: 'sustainability', label: 'Sustainability Audit Team' },
-  { value: 'fan', label: 'Spectator / Fan' },
-];
-
 function SignupFormContent() {
-  const { signUp, isDemoMode } = useAuth();
-  const searchParams = useSearchParams();
-  const roleParam = searchParams.get('role') as UserProfile['role'] | null;
+  const { signUp } = useAuth();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserProfile['role']>('visitor');
+  const [role] = useState<UserProfile['role']>('visitor');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (roleParam && ROLE_OPTIONS.some(opt => opt.value === roleParam)) {
-        setRole(roleParam);
-      } else {
-        setRole('visitor');
-      }
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [roleParam]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +30,7 @@ function SignupFormContent() {
     setIsLoading(true);
 
     try {
-      const result = await signUp(email, password, name, role);
+      const result = await signUp(email, password, name, 'visitor');
       if (result.success) {
         setSuccess(true);
       } else {
@@ -73,7 +44,7 @@ function SignupFormContent() {
     }
   };
 
-  const isVisitorPortal = role === 'visitor' || role === 'fan';
+  const isVisitorPortal = true;
 
   return (
     <div className="relative w-full max-w-md">
@@ -118,12 +89,10 @@ function SignupFormContent() {
         ) : (
           <>
             <h2 className="text-xl font-bold text-slate-100">
-              {isVisitorPortal ? 'Create Visitor Account' : 'Request Operations Account'}
+              Create Visitor Account
             </h2>
             <p className="mt-1 text-xs text-slate-400">
-              {isVisitorPortal 
-                ? 'Register details to access your spectator portal.' 
-                : 'Register credentials for stadium clearance.'}
+              Register details to access your spectator portal.
             </p>
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -149,7 +118,7 @@ function SignupFormContent() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder={isVisitorPortal ? "fan@example.com" : "name@stadiumos.ai"}
+                  placeholder="fan@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="mt-1.5"
@@ -161,13 +130,9 @@ function SignupFormContent() {
                 <label htmlFor="role" className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
                   Portal / Role Category
                 </label>
-                <Select
-                  id="role"
-                  options={ROLE_OPTIONS}
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as UserProfile['role'])}
-                  className="mt-1.5"
-                />
+                <div className="mt-1.5 p-2.5 rounded-lg border border-blue-950 bg-[#070b13] text-xs text-slate-300 font-medium">
+                  Visitor / Fan
+                </div>
               </div>
 
               <div>

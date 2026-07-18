@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, Map, Users, Bus, Accessibility, Leaf, ShieldAlert, Bot, Settings, LogOut,
   Menu, X, User, Shield, Ticket, Trophy, Bell, Search, Check, Trash2,
-  ShieldCheck, Activity, Terminal, Undo2, HelpCircle
+  ShieldCheck, Terminal, Undo2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -104,7 +104,7 @@ const getAllowedRoutes = (role: string): string[] => {
 };
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
-  const { user, signOut, isLoading, isDemoMode } = useAuth();
+  const { user, signOut, isLoading, isDemoMode, updateProfile, showToast } = useAuth();
   const isDemoAccount = !!(user?.email && [
     'visitor.demo@stadiumos.ai',
     'staff.demo@stadiumos.ai',
@@ -118,6 +118,73 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     notifications, clearNotifications, markNotificationRead, 
     executeAction, activeReport, setActiveReport, history, rollbackOperation, stadiumHealth, healthScore
   } = useStadium();
+
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [profileAvatar, setProfileAvatar] = useState('');
+  const [profilePhone, setProfilePhone] = useState('');
+  const [profileLang, setProfileLang] = useState('en');
+  const [profileEmail, setProfileEmail] = useState('');
+  const [emailStatus, setEmailStatus] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSuccess, setProfileSuccess] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      const timer = setTimeout(() => {
+        setProfileName(user.name || '');
+        setProfileAvatar(user.avatarUrl || '👤');
+        setProfilePhone(user.phoneNumber || '');
+        setProfileLang(user.preferredLanguage || 'en');
+        setProfileEmail(user.email || '');
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [user, isProfileOpen]);
+
+  const handleProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileError(null);
+    setProfileSuccess(false);
+    setProfileLoading(true);
+
+    try {
+      const emailChanged = profileEmail !== user?.email;
+      const res = await updateProfile({
+        name: profileName,
+        avatarUrl: profileAvatar,
+        phoneNumber: profilePhone,
+        preferredLanguage: profileLang,
+        email: profileEmail
+      });
+
+      if (res.success) {
+        setProfileSuccess(true);
+        if (emailChanged) {
+          showToast(
+            "✓ Verification email sent.",
+            "Your current email will remain active until verification is completed.",
+            "success"
+          );
+          setProfileEmail(user?.email || '');
+        } else {
+          showToast("✓ Profile updated successfully", undefined, "success");
+          setTimeout(() => setIsProfileOpen(false), 1200);
+        }
+      } else {
+        const errorMsg = res.error || 'Profile update failed.';
+        setProfileError(errorMsg);
+        showToast("Profile update failed", errorMsg, "error");
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'An error occurred.';
+      setProfileError(errorMsg);
+      showToast("An error occurred", errorMsg, "error");
+    } finally {
+      setProfileLoading(false);
+    }
+  };
   
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -134,8 +201,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifFilter, setNotifFilter] = useState<'all' | 'operational' | 'transport' | 'medical' | 'security' | 'visitor'>('all');
 
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [isDiagOpen, setIsDiagOpen] = useState(false);
 
   // Command Palette states
   const [isCommandOpen, setIsCommandOpen] = useState(false);
@@ -353,15 +418,23 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="p-4 border-t border-slate-900/80 bg-slate-950/20">
-          <div className="flex items-center gap-3 px-2 py-2 mb-3 rounded-lg bg-slate-950/40 border border-slate-900">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 border border-slate-700">
-              <User className="h-4.5 w-4.5 text-slate-300" />
+          <button 
+            type="button" 
+            onClick={() => setIsProfileOpen(true)}
+            className="w-full flex items-center gap-3 px-2 py-2 mb-3 rounded-lg bg-slate-950/40 border border-slate-900/60 hover:border-cyan-500/40 transition text-left cursor-pointer"
+          >
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-850 border border-slate-700 font-bold text-cyan-400 overflow-hidden shrink-0">
+              {user?.avatarUrl ? (
+                <span className="text-lg">{user.avatarUrl}</span>
+              ) : (
+                <User className="h-4.5 w-4.5 text-slate-300" />
+              )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-white truncate">{user.name}</p>
-              <p className="text-[10px] text-slate-400 truncate">{getRoleLabel(user.role)}</p>
+              <p className="text-xs font-semibold text-white truncate">{user?.name}</p>
+              <p className="text-[10px] text-slate-400 truncate">{user ? getRoleLabel(user.role) : ''}</p>
             </div>
-          </div>
+          </button>
           {isDemoMode && (
             <div className="mt-3 p-2.5 rounded-lg bg-cyan-950/25 border border-cyan-900/40 text-[10px] space-y-1">
               <span className="font-bold text-cyan-400 block flex items-center gap-1">
@@ -437,6 +510,27 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                 })}
               </nav>
               <div className="p-4 border-t border-slate-900/80 bg-slate-950/20">
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setIsMobileOpen(false);
+                    setIsProfileOpen(true);
+                  }}
+                  className="w-full flex items-center gap-3 px-2 py-2 mb-3 rounded-lg bg-slate-950/40 border border-slate-900/60 hover:border-cyan-500/40 transition text-left cursor-pointer"
+                >
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-850 border border-slate-700 font-bold text-cyan-400 overflow-hidden shrink-0">
+                    {user?.avatarUrl ? (
+                      <span className="text-lg">{user.avatarUrl}</span>
+                    ) : (
+                      <User className="h-4.5 w-4.5 text-slate-300" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-white truncate">{user?.name}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{user ? getRoleLabel(user.role) : ''}</p>
+                  </div>
+                </button>
+
                 {isDemoMode && (
                   <div className="mt-3 p-2.5 rounded-lg bg-cyan-950/25 border border-cyan-900/40 text-[10px] space-y-1">
                     <span className="font-bold text-cyan-400 block flex items-center gap-1">
@@ -534,27 +628,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                 Demo Account
               </Badge>
             )}
-            {/* Diagnostics Panel Button */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setIsDiagOpen(true)} 
-              className="text-slate-400 hover:text-cyan-400 rounded-xl cursor-pointer"
-              aria-label="Console system diagnostics"
-            >
-              <Activity className="h-4.5 w-4.5" />
-            </Button>
-
-            {/* Help Center Button */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setIsHelpOpen(true)} 
-              className="text-slate-400 hover:text-cyan-400 rounded-xl cursor-pointer"
-              aria-label="Console help center"
-            >
-              <HelpCircle className="h-4.5 w-4.5" />
-            </Button>
 
             {/* Notification Bell */}
             <div ref={notifRef} className="relative">
@@ -809,80 +882,133 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         )}
       </AnimatePresence>
 
-      {/* Global Help Center Modal */}
       <Dialog
-        isOpen={isHelpOpen}
-        onClose={() => setIsHelpOpen(false)}
-        title="StadiumOS Global Help Center"
-        description="FIFA World Cup 2026 Operations Console Guide."
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        title="Manage Visitor Profile"
+        description="Update your personal details, select an avatar, and edit account settings."
       >
-        <div className="space-y-4 max-h-96 overflow-y-auto pr-1 text-xs text-slate-300">
-          <div className="space-y-1.5">
-            <span className="font-bold text-cyan-400 block uppercase tracking-wider font-mono text-[9px]">⌨ Keyboard Shortcuts</span>
-            <div className="grid grid-cols-2 gap-2 bg-slate-950/70 p-2.5 rounded border border-slate-900 font-mono text-[10px]">
-              <div>Press <kbd className="bg-slate-900 border border-slate-800 px-1 py-0.2 rounded text-[10px]">Ctrl + K</kbd></div>
-              <div>Toggle Command Palette</div>
-              <div>Press <kbd className="bg-slate-900 border border-slate-800 px-1 py-0.2 rounded text-[10px]">Esc</kbd></div>
-              <div>Close Active Dialogs</div>
+        <form onSubmit={handleProfileSubmit} className="space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-1">
+              Select Avatar Emoji
+            </label>
+            <div className="flex gap-2.5 p-2 rounded-xl bg-slate-950/40 border border-slate-900 justify-around">
+              {['👤', '🇨🇦', '🇺🇸', '🇲🇽', '⚽', '🧣', '🏅'].map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => setProfileAvatar(emoji)}
+                  className={`text-xl h-10 w-10 flex items-center justify-center rounded-lg border transition ${
+                    profileAvatar === emoji 
+                      ? 'border-cyan-500 bg-cyan-950/30' 
+                      : 'border-slate-800 bg-[#070b13] hover:border-slate-700'
+                  }`}
+                >
+                  {emoji}
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className="space-y-1.5 border-t border-slate-900/60 pt-3">
-            <span className="font-bold text-cyan-400 block uppercase tracking-wider font-mono text-[9px]">👤 User Role Reference</span>
-            <div className="space-y-2 leading-relaxed text-slate-400">
-              <div><strong>Visitor Portal</strong>: Intended for matchday fans. Features crowd status guides, seating maps, and weather alerts.</div>
-              <div><strong>Staff Operations Desk</strong>: For stadium coordinators. Allocates volunteers, claims assistance requests, and logs alerts.</div>
-              <div><strong>FIFA Board Room</strong>: For World Cup commissioners. Coordinates multi-stadium matches, monitors playbooks, and runs Twin simulator logs.</div>
-            </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-1">
+              Full Name
+            </label>
+            <input
+              type="text"
+              value={profileName}
+              onChange={(e) => setProfileName(e.target.value)}
+              className="bg-[#070b13] border border-blue-950 text-slate-200 text-xs rounded-xl p-2.5 w-full focus:outline-none focus:border-cyan-500/50"
+              required
+            />
           </div>
 
-          <div className="space-y-1.5 border-t border-slate-900/60 pt-3">
-            <span className="font-bold text-cyan-400 block uppercase tracking-wider font-mono text-[9px]">🤖 AI Assistant & Emergency Playbooks</span>
-            <div className="space-y-1.5 leading-relaxed text-slate-400">
-              <p>Type commands inside the assistant or command palette (e.g. *&quot;Heavy rain forecast in Vancouver&quot;*) to preview AI recommendations. Press **Approve** to deploy direct visual updates.</p>
-              <p>Playbooks trigger bundled actions instantly to handle high congestion, medical emergencies, or solar load grid limits.</p>
-            </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-1">
+              Phone Number
+            </label>
+            <input
+              type="tel"
+              placeholder="+1 604-555-0199"
+              value={profilePhone}
+              onChange={(e) => setProfilePhone(e.target.value)}
+              className="bg-[#070b13] border border-blue-950 text-slate-200 text-xs rounded-xl p-2.5 w-full focus:outline-none focus:border-cyan-500/50"
+            />
           </div>
-        </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-1">
+              Preferred Language
+            </label>
+            <select
+              value={profileLang}
+              onChange={(e) => setProfileLang(e.target.value)}
+              className="bg-[#070b13] border border-blue-950 text-slate-200 text-xs rounded-xl p-2.5 w-full focus:outline-none focus:border-cyan-500/50"
+            >
+              <option value="en">English</option>
+              <option value="es">Español</option>
+              <option value="fr">Français</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-1">
+              Email Address
+            </label>
+            <input
+              type="email"
+              value={profileEmail}
+              onChange={(e) => setProfileEmail(e.target.value)}
+              className="bg-[#070b13] border border-blue-950 text-slate-200 text-xs rounded-xl p-2.5 w-full focus:outline-none focus:border-cyan-500/50"
+              required
+            />
+            {user?.email && profileEmail !== user.email && (
+              <span className="text-[10px] text-amber-400 block mt-1">
+                ⚠️ Changing email requires Supabase verification. A link will be sent to the new email.
+              </span>
+            )}
+          </div>
+
+          {emailStatus && (
+            <div className="p-3.5 rounded-lg border border-amber-500/20 bg-amber-500/10 text-xs text-amber-400">
+              {emailStatus}
+            </div>
+          )}
+
+          {profileError && (
+            <div className="p-3.5 rounded-lg border border-red-500/25 bg-red-500/10 text-xs text-red-400">
+              {profileError}
+            </div>
+          )}
+
+          {profileSuccess && !emailStatus && (
+            <div className="p-3.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-400">
+              Profile updated successfully!
+            </div>
+          )}
+
+          <div className="flex gap-2.5 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsProfileOpen(false)}
+              className="flex-1 text-xs border-slate-800 bg-[#0d1715]/40 text-slate-300 hover:text-white cursor-pointer h-9"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              isLoading={profileLoading}
+              className="flex-1 text-xs bg-cyan-600 hover:bg-cyan-700 text-white font-bold cursor-pointer h-9"
+            >
+              Save Profile
+            </Button>
+          </div>
+        </form>
       </Dialog>
 
-      {/* Diagnostics Dialog */}
-      <Dialog
-        isOpen={isDiagOpen}
-        onClose={() => setIsDiagOpen(false)}
-        title="Console System Diagnostics"
-        description="Sub-system telemetry nodes status reports."
-      >
-        <div className="space-y-4 text-xs">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-lg border border-slate-900 bg-slate-950/60 space-y-0.5">
-              <span className="text-[9px] text-slate-500 font-bold block font-mono">CPU MEMORY USE</span>
-              <span className="text-md font-black text-white font-mono">124 MB / 512 MB</span>
-            </div>
-            <div className="p-3 rounded-lg border border-slate-900 bg-slate-950/60 space-y-0.5">
-              <span className="text-[9px] text-slate-500 font-bold block font-mono">RESPONSE LATENCY</span>
-              <span className="text-md font-black text-emerald-400 font-mono">14 ms</span>
-            </div>
-          </div>
 
-          <div className="space-y-2 border-t border-slate-900/60 pt-3 text-[11px]">
-            <span className="text-[9px] text-slate-500 font-bold block font-mono uppercase">Node Services Registry</span>
-            {[
-              { label: 'AI Engine Pipeline (v1.1.2)', status: 'Nominal', color: 'text-emerald-400' },
-              { label: 'Database Telemetry Ledger', status: 'Nominal', color: 'text-emerald-400' },
-              { label: 'Live Weather Feed Service', status: 'Nominal', color: 'text-emerald-400' },
-              { label: 'CONCACAF Transit API', status: 'Nominal', color: 'text-emerald-400' },
-              { label: 'Emergency Beacon Network', status: 'Degraded', color: 'text-amber-400 animate-pulse' },
-              { label: 'PWA Offline Storage Cache', status: 'Active (1.8MB)', color: 'text-emerald-400' }
-            ].map((srv, idx) => (
-              <div key={idx} className="flex justify-between items-center py-1 border-b border-slate-900/40 font-mono">
-                <span className="text-slate-400">{srv.label}</span>
-                <span className={`font-bold ${srv.color}`}>● {srv.status}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Dialog>
 
     </div>
   );

@@ -4,6 +4,9 @@ export interface UserProfile {
   role: 'fan' | 'organizer' | 'security' | 'volunteer' | 'medical' | 'accessibility' | 'transport' | 'sustainability' | 'admin' | 'visitor' | 'staff' | 'fifa';
   name: string;
   createdAt: string;
+  avatarUrl?: string;
+  phoneNumber?: string;
+  preferredLanguage?: string;
 }
 
 export interface CrowdDensity {

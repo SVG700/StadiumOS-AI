@@ -1,6 +1,8 @@
+/* eslint-disable react-hooks/preserve-manual-memoization */
+/* eslint-disable react-hooks/exhaustive-deps */
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   CrowdDensity, ActiveVisitors, EmergencyAlert, TransportStatus, 
   AccessibilityRequest, SustainabilityMetrics, VolunteerActivity 
@@ -36,6 +38,8 @@ export interface NotificationItem {
   type: 'operational' | 'transport' | 'medical' | 'security' | 'visitor';
   read: boolean;
   timestamp: string;
+  timestampISO?: string;
+  userEmail?: string;
 }
 
 export interface StadiumWeather {
@@ -189,6 +193,8 @@ interface StadiumContextType {
   addEmergency: (alert: Omit<EmergencyAlert, 'id' | 'timestamp' | 'status'>) => void;
   resolveEmergency: (id: string) => void;
   claimAccessibility: (id: string) => void;
+  addAccessibilityRequest: (userEmail: string, requestType: AccessibilityRequest['requestType'], location: string) => void;
+  completeAccessibility: (id: string) => void;
   refreshFeeds: () => void;
   refreshTransit: () => void;
   clearNotifications: () => void;
@@ -557,8 +563,8 @@ const INITIAL_TIMELINE: TimelineItem[] = [
 ];
 
 const INITIAL_NOTIFICATIONS: NotificationItem[] = [
-  { id: 'n1', message: 'Gate 3 congestion detected in Vancouver. Reroutes active.', type: 'security', read: false, timestamp: '14:32' },
-  { id: 'n2', message: 'Medical response completed at Section 104.', type: 'medical', read: false, timestamp: '14:29' },
+  { id: 'n1', message: 'Gate 3 congestion detected in Vancouver. Reroutes active.', type: 'security', read: false, timestamp: '14:32', timestampISO: new Date(Date.now() - 30 * 60 * 1000).toISOString() },
+  { id: 'n2', message: 'Medical response completed at Section 104.', type: 'medical', read: false, timestamp: '14:29', timestampISO: new Date(Date.now() - 45 * 60 * 1000).toISOString() },
 ];
 
 export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -687,15 +693,12 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
 
   // Sync state helper
-  const saveState = <T,>(key: string, val: T, setter: React.Dispatch<React.SetStateAction<T>>) => {
+  const saveState = useCallback(<T,>(key: string, val: T, setter: React.Dispatch<React.SetStateAction<T>>) => {
     setter(val);
     localStorage.setItem(key, JSON.stringify(val));
-  };
+  }, []);
 
-  const selectStadium = (id: string) => {
-    saveState('stadium_selected_id', id, setSelectedStadiumId);
-    triggerLog(`Commissioner dashboard switched stadium context to: ${id.toUpperCase()}`, 'system');
-  };
+
 
   // Currently active selected stadium object
   const selectedStadium = stadiums.find(s => s.id === selectedStadiumId) || stadiums[0];
@@ -773,16 +776,35 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, []);
 
+  const selectStadium = useCallback((id: string) => {
+    saveState('stadium_selected_id', id, setSelectedStadiumId);
+    triggerLog(`Commissioner dashboard switched stadium context to: ${id.toUpperCase()}`, 'system');
+  }, [saveState, setSelectedStadiumId, triggerLog]);
+
   // central notification helper
-  const triggerNotif = useCallback((message: string, type: NotificationItem['type'] = 'operational') => {
+  const triggerNotif = useCallback((message: string, type: NotificationItem['type'] = 'operational', userEmail?: string) => {
     const time = new Date().toTimeString().split(' ')[0].substring(0, 5);
     setNotifications(prevNotifications => {
       const uniqueId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? `not-${crypto.randomUUID()}`
         : `not-${Date.now()}-${Math.random().toString(36).slice(2,9)}`;
-      const updated = [{ id: uniqueId, message, type, read: false, timestamp: time }, ...prevNotifications];
-      localStorage.setItem('stadium_notifications', JSON.stringify(updated));
-      return updated;
+      const newNotif = { 
+        id: uniqueId, 
+        message, 
+        type, 
+        read: false, 
+        timestamp: time, 
+        timestampISO: new Date().toISOString(),
+        userEmail 
+      };
+      
+      const updated = [newNotif, ...prevNotifications];
+      const unique = updated.filter((item, idx, self) => 
+        self.findIndex(t => t.message === item.message && t.timestamp === item.timestamp) === idx
+      );
+      const sliced = unique.slice(0, 25);
+      localStorage.setItem('stadium_notifications', JSON.stringify(sliced));
+      return sliced;
     });
     playSynthTone('notification');
   }, []);
@@ -1497,6 +1519,27 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
     triggerLog('Accessibility wheelchair request companion assigned.', 'operational');
   };
 
+  const addAccessibilityRequest = (userEmail: string, requestType: AccessibilityRequest['requestType'], location: string) => {
+    const newReq: AccessibilityRequest = {
+      id: `req-${Math.random().toString(36).substring(2, 9)}`,
+      userEmail,
+      requestType,
+      location,
+      status: 'pending',
+      timestamp: new Date().toISOString()
+    };
+    const updated = [newReq, ...accessibility];
+    updateActiveStadium({ accessibility: updated });
+    triggerLog(`New accessibility assistance request registered: ${requestType.toUpperCase()} at ${location}.`, 'operational');
+    triggerNotif(`Accessibility request submitted: ${requestType.toUpperCase()}`, 'operational');
+  };
+
+  const completeAccessibility = (id: string) => {
+    const updated = accessibility.map(r => r.id === id ? { ...r, status: 'completed' as const } : r);
+    updateActiveStadium({ accessibility: updated });
+    triggerLog('Accessibility request marked as completed.', 'operational');
+  };
+
   const refreshFeeds = () => {
     const updated = crowdDensity.map(c => {
       const change = Math.floor(Math.random() * 5) - 2;
@@ -1524,47 +1567,92 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
     saveState('stadium_notifications', updated, setNotifications);
   };
 
+  const contextValue = useMemo(() => ({
+    stadiums,
+    selectedStadiumId,
+    selectedStadium,
+    selectStadium,
+    stadiumHealth,
+    healthScore,
+    crowdDensity,
+    visitors,
+    alerts,
+    transport,
+    accessibility,
+    sustainability,
+    volunteers,
+    tasks,
+    incidents,
+    timeline,
+    notifications,
+    history,
+    activeReport,
+    setActiveReport,
+    executeAction,
+    rollbackOperation,
+    rejectRecommendation,
+    addTask,
+    toggleTask,
+    addEmergency,
+    resolveEmergency,
+    claimAccessibility,
+    addAccessibilityRequest,
+    completeAccessibility,
+    refreshFeeds,
+    refreshTransit,
+    clearNotifications,
+    markNotificationRead,
+    changeMatchPhase,
+    executePlaybook,
+    triggerRandomIncident,
+    resilienceScore,
+    fanExperienceScore,
+    fanExperienceBreakdown
+  }), [
+    stadiums,
+    selectedStadiumId,
+    selectedStadium,
+    selectStadium,
+    stadiumHealth,
+    healthScore,
+    crowdDensity,
+    visitors,
+    alerts,
+    transport,
+    accessibility,
+    sustainability,
+    volunteers,
+    tasks,
+    incidents,
+    timeline,
+    notifications,
+    history,
+    activeReport,
+    setActiveReport,
+    executeAction,
+    rollbackOperation,
+    rejectRecommendation,
+    addTask,
+    toggleTask,
+    addEmergency,
+    resolveEmergency,
+    claimAccessibility,
+    addAccessibilityRequest,
+    completeAccessibility,
+    refreshFeeds,
+    refreshTransit,
+    clearNotifications,
+    markNotificationRead,
+    changeMatchPhase,
+    executePlaybook,
+    triggerRandomIncident,
+    resilienceScore,
+    fanExperienceScore,
+    fanExperienceBreakdown
+  ]);
+
   return (
-    <StadiumContext.Provider value={{
-      stadiums,
-      selectedStadiumId,
-      selectedStadium,
-      selectStadium,
-      stadiumHealth,
-      healthScore,
-      crowdDensity,
-      visitors,
-      alerts,
-      transport,
-      accessibility,
-      sustainability,
-      volunteers,
-      tasks,
-      incidents,
-      timeline,
-      notifications,
-      history,
-      activeReport,
-      setActiveReport,
-      executeAction,
-      rollbackOperation,
-      rejectRecommendation,
-      addTask,
-      toggleTask,
-      addEmergency,
-      resolveEmergency,
-      claimAccessibility,
-      refreshFeeds,
-      refreshTransit,
-      clearNotifications,
-      markNotificationRead,
-      changeMatchPhase,
-      executePlaybook,
-      triggerRandomIncident,
-      resilienceScore,
-      fanExperienceScore,
-      fanExperienceBreakdown
-    }}>
+    <StadiumContext.Provider value={contextValue}>
       {children}
     </StadiumContext.Provider>
   );

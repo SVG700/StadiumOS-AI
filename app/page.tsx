@@ -7,7 +7,7 @@ import { Users, Ticket, Shield, Building, Globe, Trophy, Info, Star } from 'luci
 import { motion } from 'framer-motion';
 
 export default function PortalSelectionPage() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, signIn } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -16,8 +16,16 @@ export default function PortalSelectionPage() {
     }
   }, [user, isLoading, router]);
 
-  const handlePortalSelect = (portal: 'visitor' | 'staff' | 'fifa') => {
-    router.push(`/login?portal=${portal}`);
+  const handlePortalSelect = async (portal: 'visitor' | 'staff' | 'fifa') => {
+    if (portal === 'visitor') {
+      try {
+        await signIn('visitor.demo@stadiumos.ai', 'Visitor@2026');
+      } catch {
+        router.push(`/login?portal=${portal}`);
+      }
+    } else {
+      router.push(`/login?portal=${portal}`);
+    }
   };
 
   if (isLoading) {

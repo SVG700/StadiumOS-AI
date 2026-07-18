@@ -55,16 +55,31 @@ export default function FifaAiCopilotPage() {
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   // Compute stats for Context Panel
-  const totalCrowd = stadiums.reduce((sum, s) => sum + s.visitors.total, 0);
-  const totalAlerts = stadiums.reduce((sum, s) => sum + s.alerts.filter(a => a.status !== 'resolved').length, 0);
-  
-  const metrics = {
-    totalAttendance: totalCrowd,
-    avgWaitTime: selectedStadium.id === 'vancouver' ? 4.2 : 6.8,
-    medicalIncidents: totalAlerts,
-    transitDelayPercent: Math.round((stadiums.filter(s => s.transport.some(t => t.status === 'delayed')).length / stadiums.length) * 100),
-    renewablePercent: Math.round(stadiums.reduce((sum, s) => sum + s.sustainability.renewablePercentage, 0) / stadiums.length),
-  };
+  const metrics = React.useMemo(() => {
+    const totalCrowd = stadiums.reduce((sum, s) => sum + s.visitors.total, 0);
+    const totalAlerts = stadiums.reduce((sum, s) => sum + s.alerts.filter(a => a.status !== 'resolved').length, 0);
+    
+    return {
+      totalAttendance: totalCrowd,
+      avgWaitTime: selectedStadium.id === 'vancouver' ? 4.2 : 6.8,
+      medicalIncidents: totalAlerts,
+      transitDelayPercent: Math.round((stadiums.filter(s => s.transport.some(t => t.status === 'delayed')).length / stadiums.length) * 100),
+      renewablePercent: Math.round(stadiums.reduce((sum, s) => sum + s.sustainability.renewablePercentage, 0) / stadiums.length),
+    };
+  }, [stadiums, selectedStadium]);
+
+  // Check Gemini status once on mount
+  useEffect(() => {
+    async function checkStatus() {
+      try {
+        const res = await checkGeminiStatus();
+        setIsOnline(res.online);
+      } catch (e) {
+        setIsOnline(false);
+      }
+    }
+    checkStatus();
+  }, []);
 
   // 2. Select conversation & restore context
   const handleSelectConversation = React.useCallback(async (conv: Conversation) => {
