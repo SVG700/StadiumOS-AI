@@ -125,7 +125,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const [profilePhone, setProfilePhone] = useState('');
   const [profileLang, setProfileLang] = useState('en');
   const [profileEmail, setProfileEmail] = useState('');
-  const [emailStatus, setEmailStatus] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSuccess, setProfileSuccess] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -970,21 +969,9 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             )}
           </div>
 
-          {emailStatus && (
-            <div className="p-3.5 rounded-lg border border-amber-500/20 bg-amber-500/10 text-xs text-amber-400">
-              {emailStatus}
-            </div>
-          )}
-
           {profileError && (
             <div className="p-3.5 rounded-lg border border-red-500/25 bg-red-500/10 text-xs text-red-400">
               {profileError}
-            </div>
-          )}
-
-          {profileSuccess && !emailStatus && (
-            <div className="p-3.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-400">
-              Profile updated successfully!
             </div>
           )}
 

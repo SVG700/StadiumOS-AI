@@ -9,7 +9,7 @@ import { UserProfile } from '@/types';
 import { Shield, Info } from 'lucide-react';
 
 function SignupFormContent() {
-  const { signUp } = useAuth();
+  const { signUp, isDemoMode } = useAuth();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');

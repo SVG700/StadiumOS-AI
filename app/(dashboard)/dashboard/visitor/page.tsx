@@ -52,7 +52,7 @@ export default function VisitorDashboard() {
   const { user } = useAuth();
   const { 
     selectedStadium, 
-    accessibility, addAccessibilityRequest, notifications 
+    accessibility, addAccessibilityRequest, notifications, markNotificationRead
   } = useStadium();
   const [mounted, setMounted] = useState(false);
 
@@ -356,7 +356,7 @@ export default function VisitorDashboard() {
   // Chat query logic for Fan Companion
   const handleSendAiMessage = async () => {
     if (!aiInput.trim() || aiThinking) return;
-    const userMsg = { id: `usr-${Date.now()}`, sender: 'user', content: aiInput.trim(), timestamp: new Date().toISOString() };
+    const userMsg = { id: `usr-${Date.now()}`, sender: 'user' as const, content: aiInput.trim(), timestamp: new Date().toISOString() };
     setAiMessages(prev => [...prev, userMsg]);
     setAiInput('');
     setAiThinking(true);
@@ -759,66 +759,99 @@ export default function VisitorDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4 flex flex-col items-center text-center space-y-4">
-              
-              {/* Ticket selector tabs if multiple tickets */}
-              {tickets.length > 1 && (
-                <div className="flex gap-1 w-full overflow-x-auto pb-1 mb-1 justify-center scrollbar-none">
-                  {tickets.map((t, idx) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setActiveTicketIdx(idx)}
-                      className={`px-2 py-0.5 rounded text-[8px] font-bold border transition cursor-pointer ${
-                        activeTicketIdx === idx 
-                          ? 'border-cyan-500 bg-cyan-950/40 text-cyan-400 font-extrabold' 
-                          : 'border-slate-800 bg-slate-950/20 text-slate-400 hover:text-slate-200'
-                      }`}
+              {!mounted ? (
+                <div className="w-full space-y-4 py-1">
+                  <div className="h-32 w-32 rounded-2xl border border-slate-900 shimmer-skeleton mx-auto" />
+                  <div className="space-y-2.5 w-full">
+                    <div className="h-7 w-full rounded-lg shimmer-skeleton" />
+                    <div className="h-7 w-full rounded-lg shimmer-skeleton" />
+                    <div className="h-7 w-full rounded-lg shimmer-skeleton" />
+                  </div>
+                  <div className="h-9 w-full rounded-lg shimmer-skeleton" />
+                </div>
+              ) : (
+                <>
+                  {/* Ticket selector tabs if multiple tickets */}
+                  {tickets.length > 1 && (
+                    <div className="flex gap-1 w-full overflow-x-auto pb-1 mb-1 justify-center scrollbar-none">
+                      {tickets.map((t, idx) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => handleSetActiveTicketIdx(idx)}
+                          className={`px-2 py-0.5 rounded text-[8px] font-bold border transition cursor-pointer ${
+                            activeTicketIdx === idx 
+                              ? 'border-cyan-500 bg-cyan-950/40 text-cyan-400 font-extrabold' 
+                              : 'border-slate-800 bg-slate-950/20 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          Seat {t.seat}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Ticket switcher slide animation container */}
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={activeTicketIdx}
+                      initial={{ opacity: 0, x: -12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 12 }}
+                      transition={{ duration: 0.28, ease: "easeInOut" }}
+                      className="w-full flex flex-col items-center space-y-4"
                     >
-                      Seat {t.seat}
-                    </button>
-                  ))}
-                </div>
+                      {/* QR Code holographic styling with refresh animation */}
+                      <AnimatePresence mode="wait">
+                        <motion.div
+                          key={`qr-${activeTicketIdx}`}
+                          initial={{ opacity: 0.6, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0.6, scale: 0.95 }}
+                          transition={{ duration: 0.22 }}
+                          className="p-3 rounded-2xl bg-white border border-slate-200 shadow-xl shadow-cyan-950/20 relative group overflow-hidden"
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/10 via-purple-500/5 to-blue-500/10 opacity-60 pointer-events-none" />
+                          <QrCode className="h-32 w-32 text-slate-950" />
+                        </motion.div>
+                      </AnimatePresence>
+
+                      {/* Match details block */}
+                      <div className="w-full text-xs space-y-2 text-left bg-slate-950/40 p-3 rounded-xl border border-slate-900">
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500 font-mono text-[8px] uppercase">EVENT</span>
+                          <span className="text-slate-300 font-bold">{tickets[activeTicketIdx]?.event}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-t border-slate-900/40 pt-1.5">
+                          <span className="text-slate-500 font-mono text-[8px] uppercase">SEAT BLOCK</span>
+                          <span className="text-white font-extrabold text-[10px]">
+                            {tickets[activeTicketIdx]?.block} / ROW {tickets[activeTicketIdx]?.row} / SEAT {tickets[activeTicketIdx]?.seat}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center border-t border-slate-900/40 pt-1.5">
+                          <span className="text-slate-500 font-mono text-[8px] uppercase">GATE ENTRY</span>
+                          <span className="text-cyan-400 font-bold">{tickets[activeTicketIdx]?.gate}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-t border-slate-900/40 pt-1.5">
+                          <span className="text-slate-500 font-mono text-[8px] uppercase">GATE STATUS</span>
+                          <span className="text-emerald-400 font-black uppercase font-mono text-[9px] tracking-wider">● {tickets[activeTicketIdx]?.gateStatus}</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </AnimatePresence>
+
+                  {/* Add Another Match Ticket Button */}
+                  <div className="w-full pt-1">
+                    <Button 
+                      onClick={handleAddTicket}
+                      className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs h-9 rounded-lg border border-slate-800 cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Add Another Match Ticket</span>
+                    </Button>
+                  </div>
+                </>
               )}
-
-              {/* QR Code holographic styling */}
-              <div className="p-3 rounded-2xl bg-white border border-slate-200 shadow-xl shadow-cyan-950/20 relative group overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/10 via-purple-500/5 to-blue-500/10 opacity-60 pointer-events-none" />
-                <QrCode className="h-32 w-32 text-slate-950" />
-              </div>
-
-              {/* Match details block */}
-              <div className="w-full text-xs space-y-2 text-left bg-slate-950/40 p-3 rounded-xl border border-slate-900">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500 font-mono text-[8px] uppercase">EVENT</span>
-                  <span className="text-slate-300 font-bold">{tickets[activeTicketIdx]?.event}</span>
-                </div>
-                <div className="flex justify-between items-center border-t border-slate-900/40 pt-1.5">
-                  <span className="text-slate-500 font-mono text-[8px] uppercase">SEAT BLOCK</span>
-                  <span className="text-white font-extrabold text-[10px]">
-                    {tickets[activeTicketIdx]?.block} / ROW {tickets[activeTicketIdx]?.row} / SEAT {tickets[activeTicketIdx]?.seat}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center border-t border-slate-900/40 pt-1.5">
-                  <span className="text-slate-500 font-mono text-[8px] uppercase">GATE ENTRY</span>
-                  <span className="text-cyan-400 font-bold">{tickets[activeTicketIdx]?.gate}</span>
-                </div>
-                <div className="flex justify-between items-center border-t border-slate-900/40 pt-1.5">
-                  <span className="text-slate-500 font-mono text-[8px] uppercase">GATE STATUS</span>
-                  <span className="text-emerald-400 font-black uppercase font-mono text-[9px] tracking-wider">● {tickets[activeTicketIdx]?.gateStatus}</span>
-                </div>
-              </div>
-
-              {/* Add Another Match Ticket Button */}
-              <div className="w-full pt-1">
-                <Button 
-                  onClick={handleAddTicket}
-                  className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs h-9 rounded-lg border border-slate-800 cursor-pointer flex items-center justify-center gap-1"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>Add Another Match Ticket</span>
-                </Button>
-              </div>
-
             </CardContent>
           </Card>
 
@@ -834,23 +867,35 @@ export default function VisitorDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4 space-y-3.5 text-xs">
-              <div className="flex justify-between items-center p-3 rounded-xl border border-slate-900 bg-slate-950/40">
-                <span className="text-slate-400 block font-mono text-[9px] uppercase">My Transit Carbon Savings</span>
-                <span className="text-white font-black text-sm">1.8 kg CO₂</span>
-              </div>
-              <div className="space-y-2">
-                <span className="block text-slate-500 font-mono text-[8.5px] uppercase tracking-wider">Equivalent Environmental Impact:</span>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="p-2.5 rounded-lg bg-emerald-950/10 border border-emerald-900/20 text-center space-y-0.5">
-                    <span className="text-[8px] text-slate-500 block font-mono uppercase">Car Miles Avoided</span>
-                    <span className="text-emerald-400 font-black text-xs">7.4 km</span>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-emerald-950/10 border border-emerald-900/20 text-center space-y-0.5">
-                    <span className="text-[8px] text-slate-500 block font-mono uppercase">Tree Seedlings Grown</span>
-                    <span className="text-emerald-400 font-black text-xs">0.09 Seedling</span>
+              {!mounted ? (
+                <div className="space-y-3 py-1">
+                  <div className="h-12 w-full rounded-xl shimmer-skeleton" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="h-12 rounded-xl shimmer-skeleton" />
+                    <div className="h-12 rounded-xl shimmer-skeleton" />
                   </div>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="flex justify-between items-center p-3 rounded-xl border border-slate-900 bg-slate-950/40">
+                    <span className="text-slate-400 block font-mono text-[9px] uppercase">My Transit Carbon Savings</span>
+                    <span className="text-white font-black text-sm">1.8 kg CO₂</span>
+                  </div>
+                  <div className="space-y-2">
+                    <span className="block text-slate-500 font-mono text-[8.5px] uppercase tracking-wider">Equivalent Environmental Impact:</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="p-2.5 rounded-lg bg-emerald-950/10 border border-emerald-900/20 text-center space-y-0.5">
+                        <span className="text-[8px] text-slate-500 block font-mono uppercase">Car Miles Avoided</span>
+                        <span className="text-emerald-400 font-black text-xs">7.4 km</span>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-emerald-950/10 border border-emerald-900/20 text-center space-y-0.5">
+                        <span className="text-[8px] text-slate-500 block font-mono uppercase">Tree Seedlings Grown</span>
+                        <span className="text-emerald-400 font-black text-xs">0.09 Seedling</span>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -865,31 +910,40 @@ export default function VisitorDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4 space-y-3.5 text-xs">
-              <div className="grid grid-cols-2 gap-2.5 text-center">
-                <div className="p-2 border border-slate-900 bg-slate-950/40 rounded-lg space-y-0.5">
-                  <span className="text-[8px] text-slate-500 font-mono block">LIVE METRO B OCCUPANCY</span>
-                  <span className="text-[10px] font-bold text-white">75% (Moderate)</span>
+              {!mounted ? (
+                <div className="space-y-3 py-1">
+                  <div className="h-10 w-full rounded-xl shimmer-skeleton" />
+                  <div className="h-14 w-full rounded-xl shimmer-skeleton" />
                 </div>
-                <div className="p-2 border border-slate-900 bg-slate-950/40 rounded-lg space-y-0.5">
-                  <span className="text-[8px] text-slate-500 font-mono block">TAXI WAIT INDEX</span>
-                  <span className="text-[10px] font-bold text-white">~15 min wait</span>
-                </div>
-              </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-2.5 text-center">
+                    <div className="p-2 border border-slate-900 bg-slate-950/40 rounded-lg space-y-0.5">
+                      <span className="text-[8px] text-slate-500 font-mono block">LIVE METRO B OCCUPANCY</span>
+                      <span className="text-[10px] font-bold text-white">75% (Moderate)</span>
+                    </div>
+                    <div className="p-2 border border-slate-900 bg-slate-950/40 rounded-lg space-y-0.5">
+                      <span className="text-[8px] text-slate-500 font-mono block">TAXI WAIT INDEX</span>
+                      <span className="text-[10px] font-bold text-white">~15 min wait</span>
+                    </div>
+                  </div>
 
-              <div className="p-3 rounded-xl border border-slate-900 bg-slate-950/20 space-y-2">
-                <div className="flex justify-between items-center text-[10px]">
-                  <span className="text-slate-400 font-semibold">Exit Egress Delay Prediction:</span>
-                  <span className="font-bold text-amber-400">12 min Peak</span>
-                </div>
-                <div className="flex justify-between items-center text-[10px] border-t border-slate-900/40 pt-1.5">
-                  <span className="text-slate-400 font-semibold">Fastest Route Home (Metro Link):</span>
-                  <span className="font-bold text-cyan-400 font-mono">18m transit time</span>
-                </div>
-                <div className="flex justify-between items-center text-[10px] border-t border-slate-900/40 pt-1.5">
-                  <span className="text-slate-400 font-semibold">Ride-Share Pickup Zone:</span>
-                  <span className="font-bold text-white">North Deck Portal 3</span>
-                </div>
-              </div>
+                  <div className="p-3 rounded-xl border border-slate-900 bg-slate-950/20 space-y-2">
+                    <div className="flex justify-between items-center text-[10px]">
+                      <span className="text-slate-400 font-semibold">Exit Egress Delay Prediction:</span>
+                      <span className="font-bold text-amber-400">12 min Peak</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] border-t border-slate-900/40 pt-1.5">
+                      <span className="text-slate-400 font-semibold">Fastest Route Home (Metro Link):</span>
+                      <span className="font-bold text-cyan-400 font-mono">18m transit time</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] border-t border-slate-900/40 pt-1.5">
+                      <span className="text-slate-400 font-semibold">Ride-Share Pickup Zone:</span>
+                      <span className="font-bold text-white">North Deck Portal 3</span>
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -917,31 +971,41 @@ export default function VisitorDashboard() {
               )}
             </CardHeader>
             <CardContent className="pt-2 divide-y divide-slate-900/60">
-              {visitorNotifications.length === 0 ? (
-                <p className="text-[10px] text-slate-500 italic py-4 text-center">No notifications received for this matchday yet.</p>
+              {!mounted ? (
+                <div className="space-y-2.5 py-1 px-1">
+                  <div className="h-10 w-full rounded-xl shimmer-skeleton" />
+                  <div className="h-10 w-full rounded-xl shimmer-skeleton" />
+                  <div className="h-10 w-full rounded-xl shimmer-skeleton" />
+                </div>
               ) : (
-                visitorNotifications.map((notif) => (
-                  <div 
-                    key={notif.id} 
-                    onClick={() => {
-                      if (!notif.read) {
-                        markNotificationRead(notif.id);
-                      }
-                    }}
-                    className={`py-2 px-2.5 my-1 rounded-xl transition duration-200 cursor-pointer ${
-                      !notif.read 
-                        ? 'bg-cyan-950/20 border-l-2 border-cyan-500 pl-2' 
-                        : 'hover:bg-slate-900/30 border-l-2 border-transparent'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start gap-2 text-xs">
-                      <span className={`tracking-tight leading-tight ${!notif.read ? 'text-white font-extrabold' : 'text-slate-350'}`}>
-                        {notif.message}
-                      </span>
-                      <span className="text-[8px] text-slate-500 font-mono shrink-0 pt-0.5">{notif.timestamp}</span>
-                    </div>
-                  </div>
-                ))
+                <>
+                  {visitorNotifications.length === 0 ? (
+                    <p className="text-[10px] text-slate-500 italic py-4 text-center">No notifications received for this matchday yet.</p>
+                  ) : (
+                    visitorNotifications.map((notif) => (
+                      <div 
+                        key={notif.id} 
+                        onClick={() => {
+                          if (!notif.read) {
+                            markNotificationRead(notif.id);
+                          }
+                        }}
+                        className={`py-2 px-2.5 my-1 rounded-xl transition duration-200 cursor-pointer ${
+                          !notif.read 
+                            ? 'bg-cyan-950/20 border-l-2 border-cyan-500 pl-2' 
+                            : 'hover:bg-slate-900/30 border-l-2 border-transparent'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start gap-2 text-xs">
+                          <span className={`tracking-tight leading-tight ${!notif.read ? 'text-white font-extrabold' : 'text-slate-350'}`}>
+                            {notif.message}
+                          </span>
+                          <span className="text-[8px] text-slate-500 font-mono shrink-0 pt-0.5">{notif.timestamp}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -994,118 +1058,154 @@ export default function VisitorDashboard() {
               </div>
 
               {/* Content body */}
-              <div className="p-6 overflow-y-auto space-y-4 text-xs flex-1">
-                
-                {/* 1. SEAT NAVIGATION MODAL */}
-                {activeModal === 'seat' && (
-                  <div className="space-y-4">
-                    {/* SVG Map Visualizer */}
-                    <div className="w-full h-48 bg-slate-950/80 border border-slate-900 rounded-xl relative overflow-hidden flex items-center justify-center text-slate-600 font-mono text-[10px] select-none">
-                      <div className="absolute inset-0 opacity-20 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:14px_24px]" />
-                      
-                      {/* Interactive map SVG mockup */}
-                      <svg className="w-full h-full p-4" viewBox="0 0 400 200">
-                        {/* Stadium Oval Outline */}
-                        <path d="M 100,20 A 100,80 0 0,0 100,180 L 300,180 A 100,80 0 0,0 300,20 Z" fill="none" stroke="#1e293b" strokeWidth="3" />
-                        <ellipse cx="200" cy="100" rx="90" ry="45" fill="none" stroke="#334155" strokeWidth="2" strokeDasharray="5,5" />
-                        
-                        {/* Current Location Point (Gate 4) */}
-                        <circle cx="200" cy="170" r="6" fill="#14b8a6" className="animate-pulse" />
-                        <text x="180" y="190" fill="#14b8a6" fontSize="8" fontWeight="bold">Gate 4 (Start)</text>
-
-                        {/* Route Line */}
-                        <path 
-                          d={accessibleRoute ? "M 200,170 C 120,165 95,115 130,75" : "M 200,170 C 160,160 140,110 130,75"} 
-                          fill="none" 
-                          stroke="#10b981" 
-                          strokeWidth="2" 
-                          strokeDasharray="6,4"
-                          className="animate-dash"
-                        />
-
-                        {/* Target Seat Point (Sec 102) */}
-                        <circle cx="130" cy="75" r="6" fill="#ef4444" />
-                        <text x="100" y="65" fill="#ef4444" fontSize="8" fontWeight="bold">SEC 102 (Seat 14)</text>
-
-                        {/* Concessions / Restroom icons on map */}
-                        <circle cx="270" cy="80" r="4" fill="#3b82f6" />
-                        <text x="250" y="70" fill="#3b82f6" fontSize="6">Concessions Hub</text>
-                      </svg>
-                    </div>
-
-                    <div className="flex gap-4 items-center justify-between p-3.5 rounded-xl border border-slate-900 bg-slate-950/60 font-mono">
-                      <div>
-                        <span className="text-slate-500 block text-[9px] uppercase">ESTIMATED WALKING TIME</span>
-                        <span className="text-white font-black text-sm">{accessibleRoute ? '5 min' : '3 min'} (180 meters)</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block text-[9px] uppercase">CROWD CONGESTION</span>
-                        <span className="text-emerald-400 font-bold">Low Bottlenecks</span>
-                      </div>
-                    </div>
-
-                    {/* Routing Controls */}
-                    <div className="space-y-3 pt-2">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block font-mono">Navigation Preferences</span>
-                      <div className="flex flex-col gap-2">
-                        <label className="flex items-center justify-between p-3 rounded-lg border border-slate-900 bg-slate-950/20 hover:bg-slate-950/40 cursor-pointer">
-                          <div>
-                            <span className="font-bold text-white block">Accessible Route (Elevator Assisted)</span>
-                            <span className="text-[9px] text-slate-500">Reroute paths using elevators instead of concourse ramps/stairs</span>
-                          </div>
-                          <input 
-                            type="checkbox" 
-                            checked={accessibleRoute} 
-                            onChange={(e) => setAccessibleRoute(e.target.checked)} 
-                            className="h-4.5 w-4.5 accent-cyan-500 rounded border-slate-800 bg-slate-950"
-                          />
-                        </label>
-                        <label className="flex items-center justify-between p-3 rounded-lg border border-slate-900 bg-slate-950/20 hover:bg-slate-950/40 cursor-pointer">
-                          <div>
-                            <span className="font-bold text-white block">Crowd-Aware Dynamic Routing</span>
-                            <span className="text-[9px] text-slate-500">Automatically bypass crowded concourse gates and concession hubs</span>
-                          </div>
-                          <input 
-                            type="checkbox" 
-                            checked={crowdAware} 
-                            onChange={(e) => setCrowdAware(e.target.checked)} 
-                            className="h-4.5 w-4.5 accent-cyan-500 rounded border-slate-800 bg-slate-950"
-                          />
-                        </label>
-                      </div>
-                    </div>
-
-                    <Button 
-                      onClick={() => setVoiceGuideActive(!voiceGuideActive)}
-                      className={`w-full text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer flex gap-1.5 items-center justify-center ${
-                        voiceGuideActive 
-                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
-                          : 'bg-cyan-600 hover:bg-cyan-700 text-white'
-                      }`}
+              <div className="p-6 overflow-y-auto text-xs flex-1">
+                <AnimatePresence mode="wait">
+                  
+                  {/* 1. SEAT NAVIGATION MODAL */}
+                  {activeModal === 'seat' && (
+                    <motion.div
+                      key="seat"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.22 }}
+                      className="space-y-4"
                     >
-                      <Volume2 className="h-4 w-4" />
-                      <span>{voiceGuideActive ? 'Stop Audio Guide Directional Feed' : 'Start Audio Voice Navigation Guide'}</span>
-                    </Button>
-                  </div>
-                )}
+                      {/* SVG Map Visualizer */}
+                      <div className="w-full h-48 bg-slate-950/80 border border-slate-900 rounded-xl relative overflow-hidden flex items-center justify-center text-slate-600 font-mono text-[10px] select-none">
+                        <div className="absolute inset-0 opacity-20 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:14px_24px]" />
+                        
+                        {/* Interactive map SVG mockup */}
+                        <svg className="w-full h-full p-4" viewBox="0 0 400 200">
+                          {/* Stadium Oval Outline */}
+                          <path d="M 100,20 A 100,80 0 0,0 100,180 L 300,180 A 100,80 0 0,0 300,20 Z" fill="none" stroke="#1e293b" strokeWidth="3" />
+                          <ellipse cx="200" cy="100" rx="90" ry="45" fill="none" stroke="#334155" strokeWidth="2" strokeDasharray="5,5" />
+                          
+                          {/* Current Location Point (Gate 4) */}
+                          <circle cx="200" cy="170" r="6" fill="#14b8a6" className="animate-pulse" />
+                          <text x="180" y="190" fill="#14b8a6" fontSize="8" fontWeight="bold">Gate 4 (Start)</text>
+
+                          {/* Route Line */}
+                          <path 
+                            d={accessibleRoute ? "M 200,170 C 120,165 95,115 130,75" : "M 200,170 C 160,160 140,110 130,75"} 
+                            fill="none" 
+                            stroke="#10b981" 
+                            strokeWidth="2" 
+                            strokeDasharray="6,4"
+                            className="animate-dash"
+                          />
+
+                          {/* Target Seat Point (Sec 102) */}
+                          <circle cx="130" cy="75" r="6" fill="#ef4444" />
+                          <text x="100" y="65" fill="#ef4444" fontSize="8" fontWeight="bold">SEC 102 (Seat 14)</text>
+
+                          {/* Concessions / Restroom icons on map */}
+                          <circle cx="270" cy="80" r="4" fill="#3b82f6" />
+                          <text x="250" y="70" fill="#3b82f6" fontSize="6">Concessions Hub</text>
+                        </svg>
+                      </div>
+
+                      <div className="flex gap-4 items-center justify-between p-3.5 rounded-xl border border-slate-900 bg-slate-950/60 font-mono">
+                        <div className="space-y-0.5">
+                          <span className="text-[9px] text-slate-500 block uppercase">DYNAMIC ACCURACY STATUS</span>
+                          <span className="text-emerald-400 font-extrabold text-[10px]">● Live Navigation Telemetry Feed Active</span>
+                        </div>
+                        <div className="text-right space-y-0.5">
+                          <span className="text-[9px] text-slate-505 block uppercase">VENUE GPS LATENCY</span>
+                          <span className="text-white font-extrabold text-[10px]">0.08s (Ultra-low)</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-mono">Route Customizations</span>
+                        <div className="space-y-2 text-[10px]">
+                          <label className="flex items-center justify-between p-3 rounded-lg border border-slate-900 bg-slate-950/20 hover:bg-slate-950/40 cursor-pointer">
+                            <div>
+                              <span className="font-bold text-white block">Step-free / Accessible Routes</span>
+                              <span className="text-[9px] text-slate-500">Enable ramps, elevators, and companion transit guides</span>
+                            </div>
+                            <input 
+                              type="checkbox" 
+                              checked={accessibleRoute} 
+                              onChange={(e) => setAccessibleRoute(e.target.checked)} 
+                              className="h-4.5 w-4.5 accent-cyan-500 rounded border-slate-800 bg-slate-950"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between p-3 rounded-lg border border-slate-900 bg-slate-950/20 hover:bg-slate-950/40 cursor-pointer">
+                            <div>
+                              <span className="font-bold text-white block">Crowd-Aware Dynamic Routing</span>
+                              <span className="text-[9px] text-slate-500">Automatically bypass crowded concourse gates and concession hubs</span>
+                            </div>
+                            <input 
+                              type="checkbox" 
+                              checked={crowdAware} 
+                              onChange={(e) => setCrowdAware(e.target.checked)} 
+                              className="h-4.5 w-4.5 accent-cyan-500 rounded border-slate-800 bg-slate-950"
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      <Button 
+                        onClick={() => setVoiceGuideActive(!voiceGuideActive)}
+                        className={`w-full text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer flex gap-1.5 items-center justify-center ${
+                          voiceGuideActive 
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                            : 'bg-cyan-600 hover:bg-cyan-700 text-white'
+                        }`}
+                      >
+                        <Volume2 className="h-4 w-4" />
+                        <span>{voiceGuideActive ? 'Stop Audio Guide Directional Feed' : 'Start Audio Voice Navigation Guide'}</span>
+                      </Button>
+                    </motion.div>
+                  )}
 
                 {/* 2. FOOD & CONCESSIONS MODAL */}
                 {activeModal === 'food' && (
-                  <div className="space-y-4">
+                  <motion.div
+                    key="food"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.22 }}
+                    className="space-y-4"
+                  >
                     {orderStatus === 'placed' && (
                       <div className="p-4 rounded-xl border border-amber-950 bg-amber-950/10 text-center space-y-2">
-                        <span className="text-amber-400 font-bold block">Pre-order Reserved</span>
-                        <p className="text-[10px] text-slate-300">
+                        <div className="flex justify-between items-center pb-2 border-b border-amber-900/35">
+                          <span className="text-amber-400 font-bold text-xs">Pre-order Reserved</span>
+                          <Badge variant="warning" className="text-[8px] bg-amber-950/80 text-amber-400 border border-amber-800/40 py-0.5">
+                            🟡 Reserved – Payment Pending
+                          </Badge>
+                        </div>
+                        <p className="text-[10px] text-slate-350 leading-relaxed text-left">
                           Please complete payment at the Express Pickup Counter before collecting your food. Pickup: **Section 102 Express Pickup 2**. Est. wait: **{orderEta} minutes**.
                         </p>
+                        {orderReservedTime && (
+                          <div className="text-[9px] text-slate-500 font-mono text-left pt-1 flex justify-between">
+                            <span>RESERVATION TIMESTAMP</span>
+                            <span className="text-slate-400">{orderReservedTime}</span>
+                          </div>
+                        )}
                       </div>
                     )}
                     {orderStatus === 'ready' && (
-                      <div className="p-4 rounded-xl border border-emerald-950 bg-emerald-950/15 text-center space-y-2 animate-bounce">
-                        <span className="text-emerald-400 font-bold block">🚨 Order Ready for Collection!</span>
-                        <p className="text-[10px] text-slate-200">
+                      <div className="p-4 rounded-xl border border-emerald-950 bg-emerald-950/15 text-center space-y-2">
+                        <div className="flex justify-between items-center pb-2 border-b border-emerald-900/35">
+                          <span className="text-emerald-400 font-bold text-xs">Order Ready for Collection!</span>
+                          <Badge variant="success" className="text-[8px] bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 py-0.5 animate-pulse">
+                            🟢 Ready for Pickup
+                          </Badge>
+                        </div>
+                        <p className="text-[10px] text-slate-200 text-left">
                           Show QR code **ORD-8942** at Concourse Section 102 Pickup 2 desk.
                         </p>
+                        {orderReservedTime && (
+                          <div className="text-[9px] text-slate-500 font-mono text-left pt-1 flex justify-between">
+                            <span>RESERVATION TIMESTAMP</span>
+                            <span className="text-slate-400">{orderReservedTime}</span>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -1118,8 +1218,8 @@ export default function VisitorDashboard() {
                               <span className="font-bold text-white block">{item.name}</span>
                               <span className="text-[9px] text-slate-400 block mt-0.5">Popular: {item.popular}</span>
                               <div className="flex gap-2.5 mt-1 text-[8.5px] text-slate-500 font-mono">
-                                <span>Queue: {item.queueTime}m</span>
-                                <span>Prep: {item.pickupTime}m</span>
+                                  <span>Queue: {item.queueTime}m</span>
+                                  <span>Prep: {item.pickupTime}m</span>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -1143,19 +1243,47 @@ export default function VisitorDashboard() {
                         </Button>
                       </div>
                     )}
-                  </div>
+
+                    {/* Active Reservations empty/details state */}
+                    <div className="space-y-2.5 pt-4 border-t border-slate-900/60">
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-mono">My Active Concessions Orders</span>
+                      {orderStatus === 'idle' ? (
+                        <div className="p-3.5 rounded-xl border border-dashed border-slate-900 bg-slate-950/20 text-center space-y-1">
+                          <span className="text-[10px] text-slate-400 block font-semibold">No reservations yet</span>
+                          <p className="text-[9px] text-slate-505 leading-relaxed">Reserve merchandise or food to see them here.</p>
+                        </div>
+                      ) : (
+                        <div className="p-3 border border-slate-900 bg-[#080d19]/45 rounded-xl flex justify-between items-center text-xs">
+                          <div>
+                            <span className="font-bold text-white block">Pre-ordered Snacks Basket</span>
+                            <span className="text-[9.5px] text-slate-500 block mt-0.5">Section 102 Pickup 2 • {orderReservedTime}</span>
+                          </div>
+                          <Badge variant={orderStatus === 'ready' ? 'success' : 'warning'} className="text-[8px] font-mono tracking-wider uppercase bg-slate-950/80">
+                            {orderStatus === 'ready' ? '🟢 Ready' : '🟡 Pending'}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
                 )}
 
                 {/* 3. RESTROOMS MODAL */}
                 {activeModal === 'restrooms' && (
-                  <div className="space-y-4">
+                  <motion.div
+                    key="restrooms"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.22 }}
+                    className="space-y-4"
+                  >
                     <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-mono">Nearest Restrooms</span>
                     <div className="space-y-2.5">
                       {RESTROOMS.map((rm) => (
                         <div key={rm.id} className="p-3 border border-slate-900 bg-slate-950/40 rounded-xl flex justify-between items-center">
                           <div>
                             <span className="font-bold text-white block">{rm.name}</span>
-                            <span className="text-[9.5px] text-slate-500 mt-0.5 block">{rm.gender}</span>
+                            <span className="text-[9.5px] text-slate-505 mt-0.5 block">{rm.gender}</span>
                           </div>
                           <div className="text-right">
                             <Badge 
@@ -1169,12 +1297,19 @@ export default function VisitorDashboard() {
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </motion.div>
                 )}
 
                 {/* 4. PARKING MODAL */}
                 {activeModal === 'parking' && (
-                  <div className="space-y-4 text-center">
+                  <motion.div
+                    key="parking"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.22 }}
+                    className="space-y-4 text-center"
+                  >
                     <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-900 text-left space-y-2">
                       <div className="flex justify-between items-center">
                         <span className="text-slate-500 font-mono text-[8px] uppercase">PARKING DECK CLEARANCE</span>
@@ -1189,13 +1324,20 @@ export default function VisitorDashboard() {
                     <div className="p-3 rounded-2xl bg-white border border-slate-200 inline-block">
                       <QrCode className="h-32 w-32 text-slate-950" />
                     </div>
-                    <span className="block text-[8px] font-mono text-slate-500 uppercase mt-1">Scan pass QR at gate scanners</span>
-                  </div>
+                    <span className="block text-[8px] font-mono text-slate-505 uppercase mt-1">Scan pass QR at gate scanners</span>
+                  </motion.div>
                 )}
 
                 {/* 5. ACCESSIBILITY HELPER MODAL */}
                 {activeModal === 'accessibility' && (
-                  <div className="space-y-4">
+                  <motion.div
+                    key="accessibility"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.22 }}
+                    className="space-y-4"
+                  >
                     {volunteerStatus !== 'idle' && (
                       <div className="p-4 rounded-xl border border-cyan-950 bg-cyan-950/20 space-y-2">
                         <div className="flex justify-between items-center">
@@ -1204,7 +1346,7 @@ export default function VisitorDashboard() {
                             {volunteerStatus === 'assigned' && 'Volunteer Dispatched!'}
                             {volunteerStatus === 'arrived' && 'Volunteer Arrived at Seat'}
                           </span>
-                          <span className="text-[9px] font-mono text-slate-400">Sarah</span>
+                          <span className="text-[9px] font-mono text-slate-405">Sarah</span>
                         </div>
                         {volunteerStatus === 'assigned' && (
                           <p className="text-[10px] text-slate-300">
@@ -1223,24 +1365,28 @@ export default function VisitorDashboard() {
                       <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-mono">Accessibility Assistance Services</span>
                       <div className="grid gap-2 grid-cols-2">
                         <Button 
+                          type="button"
                           onClick={() => handleRequestService('guide')}
                           className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs h-10 rounded-xl cursor-pointer"
                         >
                           Volunteer Escort
                         </Button>
                         <Button 
+                          type="button"
                           onClick={() => handleRequestService('wheelchair')}
                           className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs h-10 rounded-xl cursor-pointer"
                         >
                           Wheelchair Assistance
                         </Button>
                         <Button 
+                          type="button"
                           onClick={() => handleRequestService('sign-language')}
                           className="bg-slate-900 border border-slate-800 hover:bg-slate-850 text-cyan-400 font-bold text-xs h-10 rounded-xl cursor-pointer"
                         >
                           Sign Language Guide
                         </Button>
                         <Button 
+                          type="button"
                           onClick={() => handleRequestService('sensory')}
                           className="bg-slate-900 border border-slate-800 hover:bg-slate-850 text-cyan-400 font-bold text-xs h-10 rounded-xl cursor-pointer"
                         >
@@ -1253,14 +1399,14 @@ export default function VisitorDashboard() {
                     <div className="space-y-2.5 pt-2 border-t border-slate-900/40">
                       <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-mono">Active Assistance Tickets</span>
                       {myAccessibilityTickets.length === 0 ? (
-                        <p className="text-[10px] text-slate-500 italic py-2 text-center">No active requests. Select a service above to submit a ticket.</p>
+                        <p className="text-[10px] text-slate-500 italic py-2 text-center">No active assistance requests.</p>
                       ) : (
                         <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                           {myAccessibilityTickets.map((req) => (
                             <div key={req.id} className="p-3 border border-slate-900 bg-slate-950/40 rounded-xl flex justify-between items-center text-xs">
                               <div>
                                 <span className="font-bold text-white block capitalize">{req.requestType.replace('-', ' ')} Support</span>
-                                <span className="text-[9.5px] text-slate-500 block mt-0.5">Loc: {req.location} • {new Date(req.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                <span className="text-[9.5px] text-slate-505 block mt-0.5 font-mono">Loc: {req.location} • {new Date(req.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                               </div>
                               <div className="text-right">
                                 <Badge 
@@ -1278,12 +1424,19 @@ export default function VisitorDashboard() {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </motion.div>
                 )}
 
                 {/* 6. EMERGENCY BEACON MODAL */}
                 {activeModal === 'emergency' && (
-                  <div className="space-y-4 text-center">
+                  <motion.div
+                    key="emergency"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.22 }}
+                    className="space-y-4 text-center"
+                  >
                     {emergencyAlerted ? (
                       <div className="p-5 rounded-2xl border border-rose-950 bg-rose-950/15 space-y-2 animate-pulse">
                         <span className="text-rose-400 font-extrabold text-sm block">🚨 EMERGENCY BEACON ACTIVE!</span>
@@ -1292,8 +1445,8 @@ export default function VisitorDashboard() {
                         </p>
                       </div>
                     ) : (
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-2.5 p-3.5 rounded-xl border border-rose-900/30 bg-rose-950/10 text-xs text-left">
+                      <div className="space-y-4 text-left">
+                        <div className="flex items-start gap-2.5 p-3.5 rounded-xl border border-rose-900/30 bg-rose-950/10 text-xs">
                           <ShieldAlert className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
                           <div className="space-y-0.5">
                             <span className="font-bold text-rose-400 block">Spectator Alert Confirmation</span>
@@ -1304,6 +1457,7 @@ export default function VisitorDashboard() {
                         </div>
 
                         <Button 
+                          type="button"
                           onClick={handleTriggerEmergency}
                           className="w-full bg-rose-600 hover:bg-rose-700 text-white font-extrabold py-3 rounded-xl cursor-pointer text-xs tracking-wider"
                         >
@@ -1311,21 +1465,40 @@ export default function VisitorDashboard() {
                         </Button>
                       </div>
                     )}
-                  </div>
+                  </motion.div>
                 )}
 
                 {/* 7. FAN SHOP MODAL */}
                 {activeModal === 'fanshop' && (
-                  <div className="space-y-4">
+                  <motion.div
+                    key="fanshop"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.22 }}
+                    className="space-y-4"
+                  >
                     {merchReserved && (() => {
                       const reservedItem = MERCH_ITEMS.find(m => m.id === merchReserved);
                       const reservedPriceFormatted = reservedItem ? formatPrice(parseFloat(reservedItem.price.replace(/[^0-9.]/g, ''))) : '';
+                      const timestamp = merchReservedTime[merchReserved] || '';
                       return (
-                        <div className="p-3.5 rounded-xl border border-emerald-950 bg-emerald-950/15 text-center space-y-1.5">
-                          <span className="text-emerald-400 font-bold block">Reserved Successfully</span>
-                          <p className="text-[10px] text-slate-300 leading-relaxed">
+                        <div className="p-4 rounded-xl border border-emerald-950 bg-emerald-950/15 text-center space-y-2">
+                          <div className="flex justify-between items-center pb-2 border-b border-emerald-900/35">
+                            <span className="text-emerald-400 font-bold text-xs">Reserved Successfully</span>
+                            <Badge variant="warning" className="text-[8px] bg-amber-955 text-amber-400 border border-amber-800/40 py-0.5">
+                              🟡 Reserved – Payment Pending
+                            </Badge>
+                          </div>
+                          <p className="text-[10px] text-slate-350 leading-relaxed text-left">
                             Please pay <strong className="text-white">{reservedPriceFormatted}</strong> at the Gate 3 FIFA Merchandise Counter before collecting your order (Order ID: **MCH-9812**).
                           </p>
+                          {timestamp && (
+                            <div className="text-[9px] text-slate-500 font-mono text-left pt-1 flex justify-between">
+                              <span>RESERVATION TIMESTAMP</span>
+                              <span className="text-slate-400">{timestamp}</span>
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
@@ -1345,7 +1518,8 @@ export default function VisitorDashboard() {
                             <span className="text-slate-300 font-bold font-mono mr-2">{item.price}</span>
                             <Button 
                               size="sm"
-                              onClick={() => setMerchReserved(item.id)}
+                              type="button"
+                              onClick={() => handleReserveMerch(item.id)}
                               className="bg-cyan-600 hover:bg-cyan-700 text-white text-[9px] h-7.5 px-2.5 rounded-lg cursor-pointer"
                             >
                               Reserve
@@ -1354,12 +1528,45 @@ export default function VisitorDashboard() {
                         </div>
                       ))}
                     </div>
-                  </div>
+
+                    {/* Active Reservations empty/details state */}
+                    <div className="space-y-2.5 pt-4 border-t border-slate-900/60">
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-mono">My Active Merchandise Reservations</span>
+                      {!merchReserved ? (
+                        <div className="p-3.5 rounded-xl border border-dashed border-slate-900 bg-slate-950/20 text-center space-y-1">
+                          <span className="text-[10px] text-slate-400 block font-semibold">No reservations yet</span>
+                          <p className="text-[9px] text-slate-505 leading-relaxed">Reserve merchandise or food to see them here.</p>
+                        </div>
+                      ) : (
+                        (() => {
+                          const item = MERCH_ITEMS.find(m => m.id === merchReserved);
+                          return (
+                            <div className="p-3 border border-slate-900 bg-[#080d19]/45 rounded-xl flex justify-between items-center text-xs">
+                              <div>
+                                <span className="font-bold text-white block">{item?.name || 'Souvenir Reservation'}</span>
+                                <span className="text-[9.5px] text-slate-500 block mt-0.5">Gate 3 Fan Shop • {merchReservedTime[merchReserved]}</span>
+                              </div>
+                              <Badge variant="warning" className="text-[8px] font-mono tracking-wider uppercase bg-slate-950/80">
+                                🟡 Reserved
+                              </Badge>
+                            </div>
+                          );
+                        })()
+                      )}
+                    </div>
+                  </motion.div>
                 )}
 
                 {/* 8. CHARGING STATIONS MODAL */}
                 {activeModal === 'charging' && (
-                  <div className="space-y-4">
+                  <motion.div
+                    key="charging"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.22 }}
+                    className="space-y-4"
+                  >
                     <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-mono">Nearby Charging Hubs</span>
                     <div className="space-y-2.5">
                       <div className="p-3 border border-slate-900 bg-slate-950/40 rounded-xl flex justify-between items-center">
@@ -1374,21 +1581,21 @@ export default function VisitorDashboard() {
                       <div className="p-3 border border-slate-900 bg-slate-950/40 rounded-xl flex justify-between items-center">
                         <div>
                           <span className="font-bold text-white block">Section 108 Operations Desk</span>
-                          <span className="text-[9.5px] text-slate-500 block mt-0.5">Next to accessibility volunteer kiosk</span>
+                          <span className="text-[9.5px] text-slate-505 block mt-0.5">Next to accessibility volunteer kiosk</span>
                         </div>
                         <div className="text-right">
                           <Badge variant="cyan" className="text-[8px] font-mono bg-cyan-950/50 text-cyan-400">12 Slots Free</Badge>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 )}
-
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
 
       {/* ----------------------------------------------------
           VISITOR PROFILE MODAL
@@ -1554,46 +1761,71 @@ export default function VisitorDashboard() {
               {/* Chat View */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0 flex flex-col">
                 <div className="flex-1 space-y-3.5 min-h-0">
-                  {aiMessages.map((msg, idx) => (
-                    <div 
-                      key={idx} 
-                      className={`flex gap-3 max-w-[85%] ${msg.sender === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
-                    >
-                      <div className={`h-7 w-7 rounded-full shrink-0 flex items-center justify-center border ${
-                        msg.sender === 'user' 
-                          ? 'bg-cyan-950 border-cyan-800/45 text-cyan-400' 
-                          : 'bg-slate-900 border-slate-805 text-purple-400'
-                      }`}>
-                        {msg.sender === 'user' ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
+                  {aiMessages.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center text-center p-8 h-64 space-y-3">
+                      <Bot className="h-10 w-10 text-purple-400 animate-pulse animate-bounce" />
+                      <div>
+                        <span className="font-bold text-xs text-white block">No conversations yet</span>
+                        <p className="text-[10px] text-slate-400 leading-relaxed mt-1 max-w-[200px]">
+                          Start a new chat with your FIFA Fan Companion.
+                        </p>
                       </div>
+                    </div>
+                  ) : (
+                    <AnimatePresence initial={false}>
+                      {aiMessages.map((msg, idx) => (
+                        <motion.div
+                          key={msg.id || idx}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.25 }}
+                          className={`flex gap-3 max-w-[85%] ${msg.sender === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'} my-2.5`}
+                        >
+                          <div className={`h-7 w-7 rounded-full shrink-0 flex items-center justify-center border ${
+                            msg.sender === 'user' 
+                              ? 'bg-cyan-950 border-cyan-800/45 text-cyan-400' 
+                              : 'bg-slate-900 border-slate-805 text-purple-400'
+                          }`}>
+                            {msg.sender === 'user' ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
+                          </div>
 
-                      <div className={`rounded-xl px-3.5 py-2.5 border shadow-sm ${
-                        msg.sender === 'user'
-                          ? 'bg-[#0f1b2e] border-cyan-900/30 text-slate-100'
-                          : 'bg-[#0b0f19] border-slate-900 text-slate-300'
-                      }`}>
-                        <p className="leading-relaxed text-[11px] whitespace-pre-wrap">{msg.content}</p>
-                        <span className="block text-[8px] text-slate-500 text-right mt-1.5 font-mono">
-                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  {aiThinking && (
-                    <div className="flex gap-3 max-w-[80%] mr-auto items-center">
-                      <div className="h-7 w-7 rounded-full bg-slate-900 border border-slate-800 text-purple-400 flex items-center justify-center shrink-0">
-                        <Bot className="h-3.5 w-3.5 animate-bounce" />
-                      </div>
-                      <div className="p-2 rounded-xl border border-slate-900 bg-slate-950/40 text-slate-400 text-[10px] flex items-center gap-1.5">
-                        <span className="flex gap-1 shrink-0">
-                          <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-                        </span>
-                        <span className="font-mono text-[8px] text-slate-500">Formulating advice...</span>
-                      </div>
-                    </div>
+                          <div className={`rounded-xl px-3.5 py-2.5 border shadow-sm ${
+                            msg.sender === 'user'
+                              ? 'bg-[#0f1b2e] border-cyan-900/30 text-slate-100'
+                              : 'bg-[#0b0f19] border-slate-900 text-slate-300'
+                          }`}>
+                            <p className="leading-relaxed text-[11px] whitespace-pre-wrap">{msg.content}</p>
+                            <span className="block text-[8px] text-slate-500 text-right mt-1.5 font-mono">
+                              {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
                   )}
+                  <AnimatePresence>
+                    {aiThinking && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -5 }}
+                        transition={{ duration: 0.2 }}
+                        className="flex gap-3 max-w-[80%] mr-auto items-center my-2"
+                      >
+                        <div className="h-7 w-7 rounded-full bg-slate-900 border border-slate-800 text-purple-400 flex items-center justify-center shrink-0">
+                          <Bot className="h-3.5 w-3.5 animate-bounce" />
+                        </div>
+                        <div className="p-2 rounded-xl border border-slate-900 bg-slate-950/40 text-slate-400 text-[10px] flex items-center gap-1.5">
+                          <span className="flex gap-1 shrink-0">
+                            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                          </span>
+                          <span className="font-mono text-[8px] text-slate-500">Formulating advice...</span>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                   <div ref={chatEndRef} />
                 </div>
               </div>
