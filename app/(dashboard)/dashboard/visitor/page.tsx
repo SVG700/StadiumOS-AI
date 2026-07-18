@@ -1,13 +1,14 @@
-/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { useStadium } from '@/components/stadium/StadiumContext';
+import { useStadium, NotificationItem } from '@/components/stadium/StadiumContext';
+import { AccessibilityRequest } from '@/types';
 import { DatabaseService } from '@/lib/db';
 import { jsPDF } from 'jspdf';
 import { 
@@ -46,13 +47,14 @@ interface MatchTicket {
   seat: string;
   gate: string;
   gateStatus: string;
+  orderId?: string;
 }
 
 export default function VisitorDashboard() {
   const { user } = useAuth();
   const { 
     selectedStadium, 
-    accessibility, addAccessibilityRequest, notifications, markNotificationRead
+    addAccessibilityRequest
   } = useStadium();
   const [mounted, setMounted] = useState(false);
 
@@ -90,57 +92,72 @@ export default function VisitorDashboard() {
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   // Match Tickets state (persisted in localstorage to survive refresh)
-  const [tickets, setTickets] = useState<MatchTicket[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('stadium_visitor_tickets');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-    return [
-      { id: 't1', event: 'FIFA World Cup 2026', block: 'SEC 102', row: 'H', seat: '14', gate: 'GATE 4 (North Concourse)', gateStatus: 'Open / Fluid' }
-    ];
-  });
-  
-  const [activeTicketIdx, setActiveTicketIdx] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('stadium_active_ticket_idx');
-      if (saved !== null) {
-        const idx = parseInt(saved, 10);
-        if (!isNaN(idx)) return idx;
-      }
-    }
-    return 0;
-  });
+  const [tickets, setTickets] = useState<MatchTicket[]>([]);
+  const [activeTicketIdx, setActiveTicketIdx] = useState<number>(0);
 
+  // Local isolated state hooks
+  const [visitorProfile, setVisitorProfile] = useState<{
+    name: string;
+    email: string;
+    created_at: string;
+    country: string;
+    preferred_language: string;
+  } | null>(null);
+
+  const [localNotifications, setLocalNotifications] = useState<NotificationItem[]>([]);
+  const [localAccessibilityTickets, setLocalAccessibilityTickets] = useState<AccessibilityRequest[]>([]);
+
+  // State wrappers for persistence & user scoping
   const handleSetActiveTicketIdx = (idx: number) => {
     setActiveTicketIdx(idx);
-    localStorage.setItem('stadium_active_ticket_idx', String(idx));
+    if (user) {
+      localStorage.setItem(`stadium_active_ticket_idx_${user.id}`, String(idx));
+    }
+  };
+
+  const handlePurchaseTicket = () => {
+    const randomSeat = String(Math.floor(Math.random() * 30) + 1);
+    const randomRow = String.fromCharCode(65 + Math.floor(Math.random() * 15)); // A-O
+    const randomBlock = String(101 + Math.floor(Math.random() * 20));
+    const randomGateNum = Math.floor(Math.random() * 6) + 1;
+    const randomOrderId = `TKT-${Math.floor(Math.random() * 90000) + 10000}`;
+    
+    const newTicket: MatchTicket = {
+      id: `t-${Date.now()}`,
+      event: 'FIFA World Cup 2026',
+      block: `SEC ${randomBlock}`,
+      row: randomRow,
+      seat: randomSeat,
+      gate: `GATE ${randomGateNum} (Concourse Lobby)`,
+      gateStatus: 'Open / Fluid',
+      orderId: randomOrderId
+    };
+    
+    const updated = [...tickets, newTicket];
+    setTickets(updated);
+    if (user) {
+      localStorage.setItem(`stadium_visitor_tickets_${user.id}`, JSON.stringify(updated));
+    }
+    handleSetActiveTicketIdx(updated.length - 1);
+    
+    // Add dynamically generated ticket purchase notification
+    const purchaseNotif: NotificationItem = {
+      id: `purchase-notif-${Date.now()}`,
+      message: `✓ Match Ticket purchased successfully! Seat: Sec ${randomBlock} Row ${randomRow} Seat ${randomSeat} (Order ID: ${randomOrderId})`,
+      type: 'visitor',
+      read: false,
+      timestamp: 'Just now',
+      timestampISO: new Date().toISOString()
+    };
+    const updatedNotifs = [purchaseNotif, ...localNotifications];
+    setLocalNotifications(updatedNotifs);
+    if (user) {
+      localStorage.setItem(`stadium_notifications_${user.id}`, JSON.stringify(updatedNotifs));
+    }
   };
 
   const handleAddTicket = () => {
-    const nextIndex = tickets.length + 1;
-    const seat = String(10 + nextIndex * 2);
-    const row = String.fromCharCode(65 + (nextIndex % 26));
-    const blockNum = 100 + nextIndex * 4;
-    const gateNum = (nextIndex % 6) + 1;
-    const newTicket = {
-      id: `t${nextIndex}`,
-      event: 'FIFA World Cup 2026',
-      block: `SEC ${blockNum}`,
-      row,
-      seat,
-      gate: `GATE ${gateNum} (Concourse Lobby)`,
-      gateStatus: 'Open / Fluid'
-    };
-    const updated = [...tickets, newTicket];
-    setTickets(updated);
-    localStorage.setItem('stadium_visitor_tickets', JSON.stringify(updated));
-    handleSetActiveTicketIdx(tickets.length);
+    handlePurchaseTicket();
   };
 
   // Reservation timestamps & status tracking
@@ -176,33 +193,152 @@ export default function VisitorDashboard() {
     return `${currency.symbol}${amount.toFixed(2)}`;
   }, [getCurrencyDetails]);
 
-  // Visitor-Specific isolated notifications list
-  const visitorNotifications = useMemo(() => {
-    if (!user) return [];
-    const creationTime = new Date(user.createdAt).getTime();
-    
-    return notifications
-      .filter((n) => {
-        const nTime = n.timestampISO ? new Date(n.timestampISO).getTime() : 0;
-        // 1. Created after user registration
-        if (nTime < creationTime) return false;
-        // 2. Matches user email or is broadcast
-        if (n.userEmail && n.userEmail !== user.email) return false;
-        // 3. Keep only visitor oriented alerts
-        const isVisitorOriented = ['match', 'gate', 'promo', 'transit', 'visitor'].includes(n.type);
-        if (!isVisitorOriented) return false;
-        return true;
-      })
-      .slice(0, 25);
-  }, [notifications, user]);
+  // Synchronize and initialize isolated profile & data elements
+  useEffect(() => {
+    if (!mounted || !user) return;
 
-  // Accessibility tickets targeted to active visitor
-  const myAccessibilityTickets = useMemo(() => {
-    if (!user) return [];
-    return accessibility.filter(req => 
-      req.userEmail === user.email || (user.email === 'visitor.demo@stadiumos.ai' && req.userEmail === 'visitor.demo@stadiumos.ai')
-    );
-  }, [accessibility, user]);
+    const uId = user.id;
+
+    // Load visitor_profile or initialize it
+    const profileKey = `stadium_visitor_profile_${uId}`;
+    const savedProfile = localStorage.getItem(profileKey);
+    if (!savedProfile) {
+      // First login initializer
+      const newProfile = {
+        name: user.name || 'Spectator',
+        email: user.email || '',
+        created_at: new Date().toISOString(),
+        country: 'Canada',
+        preferred_language: user.preferredLanguage || 'en'
+      };
+      setVisitorProfile(newProfile);
+      localStorage.setItem(profileKey, JSON.stringify(newProfile));
+
+      // Brand new user: clear previous storage values to guarantee no leak
+      localStorage.removeItem(`stadium_visitor_tickets_${uId}`);
+      localStorage.removeItem(`stadium_active_ticket_idx_${uId}`);
+      localStorage.removeItem(`stadium_order_status_${uId}`);
+      localStorage.removeItem(`stadium_order_eta_${uId}`);
+      localStorage.removeItem(`stadium_order_reserved_time_${uId}`);
+      localStorage.removeItem(`stadium_merch_reserved_${uId}`);
+      localStorage.removeItem(`stadium_merch_reserved_time_${uId}`);
+      localStorage.removeItem(`stadium_volunteer_status_${uId}`);
+      localStorage.removeItem(`stadium_volunteer_eta_${uId}`);
+      localStorage.removeItem(`stadium_accessibility_${uId}`);
+      localStorage.removeItem(`stadium_ai_messages_${uId}`);
+
+      // Initialize notifications with Welcome Notification only
+      const welcome: NotificationItem = {
+        id: `welcome-${uId}`,
+        message: 'Welcome to the FIFA World Cup 2026 Companion! Map your gate, pre-order concessions, and query our AI Companion for route support.',
+        type: 'visitor',
+        read: false,
+        timestamp: 'Just now',
+        timestampISO: new Date().toISOString()
+      };
+      localStorage.setItem(`stadium_notifications_${uId}`, JSON.stringify([welcome]));
+      setLocalNotifications([welcome]);
+      setTickets([]);
+      setActiveTicketIdx(0);
+      setOrderStatus('idle');
+      setOrderEta(0);
+      setOrderReservedTime(null);
+      setMerchReserved(null);
+      setMerchReservedTime({});
+      setVolunteerStatus('idle');
+      setVolunteerEta(4);
+      setLocalAccessibilityTickets([]);
+      setAiMessages([]);
+    } else {
+      try {
+        setVisitorProfile(JSON.parse(savedProfile));
+      } catch (e) {
+        console.error(e);
+      }
+
+      // Load existing isolated user data
+      const savedTickets = localStorage.getItem(`stadium_visitor_tickets_${uId}`);
+      if (savedTickets) {
+        try { setTickets(JSON.parse(savedTickets)); } catch { setTickets([]); }
+      } else {
+        setTickets([]);
+      }
+
+      const savedIdx = localStorage.getItem(`stadium_active_ticket_idx_${uId}`);
+      if (savedIdx !== null) {
+        const idx = parseInt(savedIdx, 10);
+        if (!isNaN(idx)) setActiveTicketIdx(idx);
+      } else {
+        setActiveTicketIdx(0);
+      }
+
+      const savedOrderStatus = localStorage.getItem(`stadium_order_status_${uId}`) as 'idle' | 'placed' | 'ready' | null;
+      setOrderStatus(savedOrderStatus || 'idle');
+
+      const savedOrderEta = localStorage.getItem(`stadium_order_eta_${uId}`);
+      setOrderEta(savedOrderEta ? parseInt(savedOrderEta, 10) : 0);
+
+      const savedOrderTime = localStorage.getItem(`stadium_order_reserved_time_${uId}`);
+      setOrderReservedTime(savedOrderTime);
+
+      const savedMerch = localStorage.getItem(`stadium_merch_reserved_${uId}`);
+      setMerchReserved(savedMerch);
+
+      const savedMerchTimes = localStorage.getItem(`stadium_merch_reserved_time_${uId}`);
+      if (savedMerchTimes) {
+        try { setMerchReservedTime(JSON.parse(savedMerchTimes)); } catch { setMerchReservedTime({}); }
+      } else {
+        setMerchReservedTime({});
+      }
+
+      const savedVolStatus = localStorage.getItem(`stadium_volunteer_status_${uId}`) as 'idle' | 'requested' | 'assigned' | 'arrived' | null;
+      setVolunteerStatus(savedVolStatus || 'idle');
+
+      const savedVolEta = localStorage.getItem(`stadium_volunteer_eta_${uId}`);
+      setVolunteerEta(savedVolEta ? parseInt(savedVolEta, 10) : 4);
+
+      const savedAccessibility = localStorage.getItem(`stadium_accessibility_${uId}`);
+      if (savedAccessibility) {
+        try { setLocalAccessibilityTickets(JSON.parse(savedAccessibility)); } catch { setLocalAccessibilityTickets([]); }
+      } else {
+        setLocalAccessibilityTickets([]);
+      }
+
+      const savedAiMessages = localStorage.getItem(`stadium_ai_messages_${uId}`);
+      if (savedAiMessages) {
+        try { setAiMessages(JSON.parse(savedAiMessages)); } catch { setAiMessages([]); }
+      } else {
+        setAiMessages([]);
+      }
+
+      const savedNotifications = localStorage.getItem(`stadium_notifications_${uId}`);
+      if (savedNotifications) {
+        try { setLocalNotifications(JSON.parse(savedNotifications)); } catch { setLocalNotifications([]); }
+      } else {
+        setLocalNotifications([]);
+      }
+    }
+  }, [user, mounted]);
+
+  // Derived memo variables referencing local isolated states instead of global ones
+  const visitorNotifications = localNotifications;
+  const myAccessibilityTickets = localAccessibilityTickets;
+
+  const handleMarkAllReadLocal = () => {
+    const updated = localNotifications.map(n => ({ ...n, read: true }));
+    setLocalNotifications(updated);
+    if (user) {
+      localStorage.setItem(`stadium_notifications_${user.id}`, JSON.stringify(updated));
+    }
+  };
+
+  const handleMarkReadLocal = (id: string) => {
+    const updated = localNotifications.map(n => n.id === id ? { ...n, read: true } : n);
+    setLocalNotifications(updated);
+    if (user) {
+      localStorage.setItem(`stadium_notifications_${user.id}`, JSON.stringify(updated));
+    }
+  };
 
   const handleRequestService = (type: 'wheelchair' | 'guide' | 'sensory' | 'sign-language') => {
     addAccessibilityRequest(user?.email || 'visitor.demo@stadiumos.ai', type, 'Section 102 Row H');
@@ -212,19 +348,46 @@ export default function VisitorDashboard() {
   };
 
   // Visitor Profile custom configurations
-  const profileDetails = {
-    favoriteTeam: 'Canada',
-    visits: ['BC Place (Vancouver)', 'Lumen Field (Seattle)', 'MetLife Stadium (New York)'],
-    matchHistory: [
-      { date: '2026-06-12', fixture: 'CAN vs NGA', result: '2 - 1' },
-      { date: '2026-07-04', fixture: 'USA vs GER', result: '3 - 2' }
-    ],
-    carbonSavedTotal: '24.5 kg CO₂',
-    orders: [
-      { id: 'ORD-8942', items: '1x Double Cheeseburger, 1x Soda', total: '$18.50', status: 'Completed' }
-    ],
-    emergencyContacts: 'Primary: Sarah Connor (+1 604-555-0199)'
+  const getDynamicProfileDetails = () => {
+    const defaultCountry = visitorProfile?.country || 'Canada';
+    const isNewUser = user && user.email !== 'visitor.demo@stadiumos.ai';
+    
+    if (isNewUser) {
+      const activeVisits = tickets.length > 0 ? [selectedStadium.name] : [];
+      const matchHistory = tickets.length > 0 ? [
+        { date: '2026-07-18', fixture: `${selectedStadium.match?.teamA || 'ARG'} vs ${selectedStadium.match?.teamB || 'GER'}`, result: 'Upcoming' }
+      ] : [];
+      
+      const orders = orderStatus !== 'idle' ? [
+        { id: 'ORD-8942', items: 'Pre-ordered Snacks Basket', total: '$18.50', status: orderStatus === 'ready' ? 'Ready' : 'Pending' }
+      ] : [];
+      
+      return {
+        favoriteTeam: defaultCountry,
+        visits: activeVisits,
+        matchHistory,
+        carbonSavedTotal: tickets.length > 0 ? '4.2 kg CO₂' : '0.0 kg CO₂',
+        orders,
+        emergencyContacts: 'None configured'
+      };
+    }
+    
+    return {
+      favoriteTeam: 'Canada',
+      visits: ['BC Place (Vancouver)', 'Lumen Field (Seattle)', 'MetLife Stadium (New York)'],
+      matchHistory: [
+        { date: '2026-06-12', fixture: 'CAN vs NGA', result: '2 - 1' },
+        { date: '2026-07-04', fixture: 'USA vs GER', result: '3 - 2' }
+      ],
+      carbonSavedTotal: '24.5 kg CO₂',
+      orders: [
+        { id: 'ORD-8942', items: '1x Double Cheeseburger, 1x Soda', total: '$18.50', status: 'Completed' }
+      ],
+      emergencyContacts: 'Primary: Sarah Connor (+1 604-555-0199)'
+    };
   };
+
+  const profileDetails = getDynamicProfileDetails();
 
   // Match statistics (derived / simulated)
   const matchStats = {
@@ -469,9 +632,15 @@ export default function VisitorDashboard() {
           <Badge variant="cyan" className="px-3 py-1 uppercase tracking-widest text-[9px] font-bold">
             Spectator Entry
           </Badge>
-          <Badge variant="secondary" className="px-3 py-1 font-mono text-[9px] text-slate-400 border-slate-800 bg-slate-950/50">
-            Seat: {tickets[activeTicketIdx]?.block || 'SEC 102'} | ROW {tickets[activeTicketIdx]?.row || 'H'} | SEAT {tickets[activeTicketIdx]?.seat || '14'}
-          </Badge>
+          {tickets.length > 0 ? (
+            <Badge variant="secondary" className="px-3 py-1 font-mono text-[9px] text-slate-300 border-slate-800 bg-slate-950/50">
+              Seat: {tickets[activeTicketIdx]?.block} | ROW {tickets[activeTicketIdx]?.row} | SEAT {tickets[activeTicketIdx]?.seat}
+            </Badge>
+          ) : (
+            <Badge variant="warning" className="px-3 py-1 font-mono text-[9px] text-amber-400 border-amber-800/40 bg-amber-950/20">
+              No Match Ticket purchased
+            </Badge>
+          )}
           <Button 
             size="sm" 
             onClick={() => setIsProfileOpen(true)}
@@ -769,6 +938,17 @@ export default function VisitorDashboard() {
                   </div>
                   <div className="h-9 w-full rounded-lg shimmer-skeleton" />
                 </div>
+              ) : tickets.length === 0 ? (
+                <div className="w-full py-6 space-y-4">
+                  <div className="text-slate-400 font-bold text-xs uppercase tracking-wide">No active tickets.</div>
+                  <Button 
+                    onClick={handlePurchaseTicket}
+                    className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-extrabold text-xs h-10 rounded-xl cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>+ Purchase Match Ticket</span>
+                  </Button>
+                </div>
               ) : (
                 <>
                   {/* Ticket selector tabs if multiple tickets */}
@@ -959,11 +1139,7 @@ export default function VisitorDashboard() {
               {visitorNotifications.some(n => !n.read) && (
                 <button
                   type="button"
-                  onClick={() => {
-                    visitorNotifications.forEach(n => {
-                      if (!n.read) markNotificationRead(n.id);
-                    });
-                  }}
+                  onClick={handleMarkAllReadLocal}
                   className="text-[9px] font-bold text-cyan-400 hover:text-cyan-300 transition uppercase cursor-pointer bg-transparent border-none outline-none"
                 >
                   Mark All Read
@@ -987,7 +1163,7 @@ export default function VisitorDashboard() {
                         key={notif.id} 
                         onClick={() => {
                           if (!notif.read) {
-                            markNotificationRead(notif.id);
+                            handleMarkReadLocal(notif.id);
                           }
                         }}
                         className={`py-2 px-2.5 my-1 rounded-xl transition duration-200 cursor-pointer ${
@@ -1095,9 +1271,11 @@ export default function VisitorDashboard() {
                             className="animate-dash"
                           />
 
-                          {/* Target Seat Point (Sec 102) */}
+                          {/* Target Seat Point */}
                           <circle cx="130" cy="75" r="6" fill="#ef4444" />
-                          <text x="100" y="65" fill="#ef4444" fontSize="8" fontWeight="bold">SEC 102 (Seat 14)</text>
+                          <text x="100" y="65" fill="#ef4444" fontSize="8" fontWeight="bold">
+                            {tickets.length > 0 ? `${tickets[activeTicketIdx]?.block} (Seat ${tickets[activeTicketIdx]?.seat})` : 'No Ticket'}
+                          </text>
 
                           {/* Concessions / Restroom icons on map */}
                           <circle cx="270" cy="80" r="4" fill="#3b82f6" />

@@ -126,7 +126,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const [profileLang, setProfileLang] = useState('en');
   const [profileEmail, setProfileEmail] = useState('');
   const [profileError, setProfileError] = useState<string | null>(null);
-  const [profileSuccess, setProfileSuccess] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
 
   useEffect(() => {
@@ -145,7 +144,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfileError(null);
-    setProfileSuccess(false);
     setProfileLoading(true);
 
     try {
@@ -159,7 +157,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
       });
 
       if (res.success) {
-        setProfileSuccess(true);
         if (emailChanged) {
           showToast(
             "✓ Verification email sent.",

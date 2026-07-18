@@ -4,12 +4,13 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { useRouter, usePathname } from 'next/navigation';
 import { getSupabaseBrowserClient, isSupabaseConfigured } from '@/lib/supabase/client';
 import { UserProfile } from '@/types';
+import { Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
   user: UserProfile | null;
   isLoading: boolean;
   isDemoMode: boolean;
-  signUp: (email: string, password: string, name: string, role: UserProfile['role']) => Promise<{ success: boolean; error?: string }>;
+  signUp: (email: string, password: string, name: string, role: UserProfile['role']) => Promise<{ success: boolean; error?: string; session?: Session | null; email?: string }>;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<{ success: boolean }>;
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
@@ -43,6 +44,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = getSupabaseBrowserClient();
 
   useEffect(() => {
+    let unsubscribeFn: (() => void) | null = null;
+    let isMounted = true;
+
     async function initSession() {
       setIsLoading(true);
 
@@ -50,13 +54,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (isSupabaseConfigured && supabase) {
         try {
           const { data: { session } } = await supabase.auth.getSession();
+          
+          if (!isMounted) return;
+
           if (session?.user) {
+            // Verify email confirmation
+            if (!session.user.email_confirmed_at) {
+              await supabase.auth.signOut();
+              setUser(null);
+              setIsLoading(false);
+              return;
+            }
+
             // Retrieve custom profile information (role, name) from the profiles table
             const { data: profile, error } = await supabase
               .from('profiles')
               .select('*')
               .eq('id', session.user.id)
               .single();
+
+            if (!isMounted) return;
 
             const rawRole = session.user.user_metadata?.role || profile?.role || 'organizer';
             const mappedRole = mapDbRoleToPortalRole(rawRole);
@@ -96,12 +113,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           // Set up auth state change listener
           const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (!isMounted) return;
+
             if (session?.user) {
+              if (!session.user.email_confirmed_at) {
+                await supabase.auth.signOut();
+                setUser(null);
+                return;
+              }
+
               const { data: profile } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', session.user.id)
                 .single();
+
+              if (!isMounted) return;
 
               const rawRole = session.user.user_metadata?.role || profile?.role || 'organizer';
               const mappedRole = mapDbRoleToPortalRole(rawRole);
@@ -121,15 +148,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           });
 
-          return () => {
+          unsubscribeFn = () => {
             subscription.unsubscribe();
           };
         } catch (err) {
-          console.error('Supabase Auth Initialization failed, falling back to Demo Mode:', err);
+          console.error('Supabase Auth Initialization failed:', err);
+        } finally {
+          if (isMounted) {
+            setIsLoading(false);
+          }
         }
+        return; // Skip all local demo initialization when Supabase is configured
       }
 
-      // --- JUDGE DEMO ACCOUNT BOOTSTRAP ---
+      // --- LOCAL DEMO SESSION MANAGEMENT ---
       const demoUsersStr = localStorage.getItem('stadium_os_demo_users') || '[]';
       let demoUsers = [];
       try {
@@ -158,39 +190,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           updatedLocal = true;
         }
       });
-      if (updatedLocal) {
+      if (updatedLocal && isMounted) {
         localStorage.setItem('stadium_os_demo_users', JSON.stringify(demoUsers));
       }
 
-      if (isSupabaseConfigured && supabase) {
-        try {
-          const { data: existingProfiles } = await supabase
-            .from('profiles')
-            .select('email')
-            .in('email', ['visitor.demo@stadiumos.ai', 'staff.demo@stadiumos.ai', 'fifa.demo@stadiumos.ai']);
-          
-          const existingEmails = (existingProfiles || []).map(p => p.email);
-          
-          for (const target of targetDemoUsers) {
-            if (!existingEmails.includes(target.email)) {
-              await supabase.auth.signUp({
-                email: target.email,
-                password: target.password,
-                options: {
-                  data: { name: target.name, role: target.role },
-                  emailRedirectTo: `${window.location.origin}/auth/callback`,
-                }
-              }).catch(() => {});
-            }
-          }
-        } catch (err) {
-          console.warn('Supabase demo bootstrap warning:', err);
-        }
-      }
-
-      // --- LOCAL DEMO SESSION MANAGEMENT ---
       const demoUserStr = localStorage.getItem('stadium_os_demo_user');
-      if (demoUserStr) {
+      if (demoUserStr && isMounted) {
         try {
           const demoUser = JSON.parse(demoUserStr);
           setUser(demoUser);
@@ -198,21 +203,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.removeItem('stadium_os_demo_user');
         }
       }
-      setIsLoading(false);
+      
+      if (isMounted) {
+        setIsLoading(false);
+      }
     }
 
-    initSession().finally(() => {
-      setIsLoading(false);
-    });
+    initSession();
+
+    return () => {
+      isMounted = false;
+      if (unsubscribeFn) {
+        unsubscribeFn();
+      }
+    };
   }, [supabase]);
 
   // Auth Guard / Redirects
   useEffect(() => {
     if (isLoading) return;
-
     const publicPaths = ['/login', '/signup', '/forgot-password', '/auth/callback'];
     const isPublicPath = publicPaths.some(path => pathname.startsWith(path));
-
     if (!user && !isPublicPath && pathname !== '/') {
       router.push('/login');
     } else if (user && (isPublicPath || pathname === '/')) {
@@ -220,13 +231,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, isLoading, pathname, router]);
 
+  // Clean up localStorage on auth state changes (Wipe demo data)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const bannedKeys = ['visitor.demo', 'demouser', 'guest', 'anonymous', 'sample', 'default'];
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key) {
+        const lowerKey = key.toLowerCase();
+        if (bannedKeys.some(banned => lowerKey.includes(banned))) {
+          keysToRemove.push(key);
+        }
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+  }, [user]);
+
   // --- SIGN UP ---
   const signUp = async (
     email: string,
     password: string,
     name: string,
     role: UserProfile['role']
-  ): Promise<{ success: boolean; error?: string }> => {
+  ): Promise<{ success: boolean; error?: string; session?: Session | null; email?: string }> => {
     if (isSupabaseConfigured && supabase) {
       try {
         const { data, error } = await supabase.auth.signUp({
@@ -258,6 +286,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.warn('Profile sync warning:', profileError.message);
           }
         }
+
+        return {
+          success: true,
+          session: data.session,
+          email: data.user?.email || email
+        };
 
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Supabase signup failed';
@@ -294,6 +328,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // --- SIGN IN ---
   const signIn = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { error, data } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) return { success: false, error: error.message };
+
+        if (data?.user) {
+          if (!data.user.email_confirmed_at) {
+            await supabase.auth.signOut();
+            return { success: false, error: 'Please verify your email first.' };
+          }
+
+          // Automatically store the mapped role in metadata upon login
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', data.user.id)
+            .single();
+          
+          const rawRole = data.user.user_metadata?.role || profile?.role || 'organizer';
+          const mappedRole = mapDbRoleToPortalRole(rawRole);
+
+          await supabase.auth.updateUser({
+            data: { role: mappedRole }
+          }).catch(() => {});
+        }
+
+        return { success: true };
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Supabase signin failed';
+        return { success: false, error: errorMsg };
+      }
+    }
+
     // Intercept Demo Accounts for Judges (Bypasses email verification)
     const demoAccounts = [
       { email: 'visitor.demo@stadiumos.ai', password: 'Visitor@2026', name: 'Visitor Demo', role: 'visitor' as const },
@@ -313,54 +380,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
         localStorage.setItem('stadium_os_demo_user', JSON.stringify(demoUser));
         
-        if (isSupabaseConfigured && supabase) {
-          (async () => {
-            try {
-              await supabase.from('profiles').upsert({
-                id: `demo-${matchedDemo.role}-id`,
-                name: matchedDemo.name,
-                role: matchedDemo.role,
-                email: matchedDemo.email,
-                created_at: new Date().toISOString()
-              });
-            } catch (err) {
-              console.warn('Supabase demo upsert failed', err);
-            }
-          })();
-        }
-
         setUser(demoUser);
         router.push(getDashboardForRole(demoUser.role));
         return { success: true };
       } else {
         return { success: false, error: 'Invalid credentials for protected demo account.' };
-      }
-    }
-
-    if (isSupabaseConfigured && supabase) {
-      try {
-        const { error, data } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) return { success: false, error: error.message };
-
-        // Automatically store the mapped role in metadata upon login
-        if (data?.user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', data.user.id)
-            .single();
-          
-          const rawRole = data.user.user_metadata?.role || profile?.role || 'organizer';
-          const mappedRole = mapDbRoleToPortalRole(rawRole);
-
-          await supabase.auth.updateUser({
-            data: { role: mappedRole }
-          }).catch(() => {});
-        }
-
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : 'Supabase signin failed';
-        return { success: false, error: errorMsg };
       }
     }
 

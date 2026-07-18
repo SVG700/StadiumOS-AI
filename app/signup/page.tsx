@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { UserProfile } from '@/types';
 import { Shield, Info } from 'lucide-react';
+import { Session } from '@supabase/supabase-js';
 
 function SignupFormContent() {
   const { signUp, isDemoMode } = useAuth();
@@ -18,6 +19,8 @@ function SignupFormContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+  const [registeredEmail, setRegisteredEmail] = useState<string>('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,6 +35,8 @@ function SignupFormContent() {
     try {
       const result = await signUp(email, password, name, 'visitor');
       if (result.success) {
+        setSession(result.session || null);
+        setRegisteredEmail(result.email || email);
         setSuccess(true);
       } else {
         setError(result.error || 'Account request failed.');
@@ -70,21 +75,41 @@ function SignupFormContent() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h2 className="text-lg font-bold text-slate-100">Registration Complete</h2>
             {isDemoMode ? (
-              <p className="text-xs text-slate-400 leading-relaxed">
-                In Demo Mode, your account is simulated and auto-authorized. You are now logged in and being redirected...
-              </p>
+              <>
+                <h2 className="text-lg font-bold text-slate-100">Registration Complete</h2>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  In Demo Mode, your account is simulated and auto-authorized. You are now logged in and being redirected...
+                </p>
+              </>
+            ) : !session ? (
+              <>
+                <h2 className="text-lg font-bold text-slate-100">Account created successfully.</h2>
+                <p className="text-xs text-emerald-400 font-semibold leading-relaxed">
+                  Please verify your email before signing in.
+                </p>
+                <div className="my-3 p-3 rounded-lg border border-blue-950 bg-[#070b13] text-xs text-cyan-400 font-mono break-all text-center">
+                  {registeredEmail}
+                </div>
+                <div className="pt-2">
+                  <Button className="w-full" disabled={true}>
+                    Proceed to Sign In
+                  </Button>
+                </div>
+              </>
             ) : (
-              <p className="text-xs text-slate-400 leading-relaxed">
-                An email verification link has been sent to your address. Please verify your email to log in to the system.
-              </p>
+              <>
+                <h2 className="text-lg font-bold text-slate-100">Registration Complete</h2>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  You have registered successfully. Redirecting to your dashboard...
+                </p>
+                <div className="pt-2">
+                  <Link href="/dashboard">
+                    <Button className="w-full">Go to Dashboard</Button>
+                  </Link>
+                </div>
+              </>
             )}
-            <div className="pt-2">
-              <Link href="/login">
-                <Button className="w-full">Proceed to Sign In</Button>
-              </Link>
-            </div>
           </div>
         ) : (
           <>
