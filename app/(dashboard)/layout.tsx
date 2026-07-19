@@ -97,10 +97,12 @@ const COMMAND_PALETTE_ITEMS = [
   { label: 'Generate Sustainability Audit', actionType: 'GENERATE_REPORT', desc: 'Compiles matchday carbon ledger', category: 'Audit' },
 ];
 
-const getAllowedRoutes = (role: string): string[] => {
-  if (role === 'visitor' || role === 'fan') return ROLE_ALLOWED_ROUTES.visitor;
-  if (role === 'fifa' || role === 'admin') return ROLE_ALLOWED_ROUTES.fifa;
-  return ROLE_ALLOWED_ROUTES.staff;
+const getAllowedRoutes = (role?: string | null): string[] => {
+  if (!role) return ROLE_ALLOWED_ROUTES.visitor;
+  const normalized = role.toLowerCase().trim();
+  if (normalized === 'fifa' || normalized === 'admin') return ROLE_ALLOWED_ROUTES.fifa;
+  if (normalized === 'staff' || normalized === 'organizer' || normalized === 'manager') return ROLE_ALLOWED_ROUTES.staff;
+  return ROLE_ALLOWED_ROUTES.visitor;
 };
 
 function LayoutContent({ children }: { children: React.ReactNode }) {

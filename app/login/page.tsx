@@ -68,23 +68,6 @@ function LoginFormContent() {
     }
   };
 
-  // Auto-fill credentials when switching portals
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (selectedPortal === 'visitor') {
-        setEmail('visitor.demo@stadiumos.ai');
-        setPassword('Visitor@2026');
-      } else if (selectedPortal === 'staff') {
-        setEmail('staff.demo@stadiumos.ai');
-        setPassword('Staff@2026');
-      } else if (selectedPortal === 'fifa') {
-        setEmail('fifa.demo@stadiumos.ai');
-        setPassword('FIFA@2026');
-      }
-      setError(null);
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [selectedPortal]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

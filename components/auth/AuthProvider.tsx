@@ -24,16 +24,20 @@ interface DemoUser extends UserProfile {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function mapDbRoleToPortalRole(dbRole: string): UserProfile['role'] {
-  if (dbRole === 'fan' || dbRole === 'visitor') return 'visitor';
-  if (dbRole === 'admin' || dbRole === 'fifa') return 'fifa';
-  return 'staff';
+export function mapDbRoleToPortalRole(dbRole?: string | null): UserProfile['role'] {
+  if (!dbRole) return 'visitor';
+  const normalized = dbRole.toLowerCase().trim();
+  if (normalized === 'fifa' || normalized === 'admin') return 'fifa';
+  if (normalized === 'staff' || normalized === 'organizer' || normalized === 'manager') return 'staff';
+  return 'visitor';
 }
 
-export function getDashboardForRole(role: string): string {
-  if (role === 'visitor' || role === 'fan') return '/dashboard/visitor';
-  if (role === 'fifa' || role === 'admin') return '/dashboard/fifa';
-  return '/dashboard/staff';
+export function getDashboardForRole(role?: string | null): string {
+  if (!role) return '/dashboard/visitor';
+  const normalized = role.toLowerCase().trim();
+  if (normalized === 'fifa' || normalized === 'admin') return '/dashboard/fifa';
+  if (normalized === 'staff' || normalized === 'organizer' || normalized === 'manager') return '/dashboard/staff';
+  return '/dashboard/visitor';
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -86,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
 
             // Retrieve custom profile information (role, name) from the profiles table
-            const { data: profile, error } = await supabase
+            const { data: profile } = await supabase
               .from('profiles')
               .select('*')
               .eq('id', session.user.id)
@@ -94,38 +98,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (!isMounted) return;
 
-            const rawRole = session.user.user_metadata?.role || profile?.role || 'organizer';
+            // Prioritize profile table role, then user_metadata role, defaulting to visitor
+            const profileRole = profile?.role;
+            const metadataRole = session.user.user_metadata?.role;
+            const rawRole = profileRole || metadataRole || 'visitor';
             const mappedRole = mapDbRoleToPortalRole(rawRole);
 
-            // Update user metadata in Supabase if not set
-            if (!session.user.user_metadata?.role) {
-              await supabase.auth.updateUser({
-                data: { role: mappedRole }
-              }).catch(() => {});
-            }
+            const userProfile: UserProfile = {
+              id: session.user.id,
+              email: session.user.email || '',
+              name: profile?.name || session.user.user_metadata?.name || (mappedRole === 'visitor' ? 'Visitor / Fan' : mappedRole === 'fifa' ? 'FIFA Executive' : 'Staff Member'),
+              role: mappedRole,
+              createdAt: profile?.created_at || session.user.created_at || new Date().toISOString(),
+              avatarUrl: profile?.avatar_url || session.user.user_metadata?.avatarUrl,
+              phoneNumber: profile?.phone_number,
+              preferredLanguage: profile?.preferred_language,
+            };
 
-            if (!error && profile) {
-              setUser({
-                id: session.user.id,
-                email: session.user.email || '',
-                name: profile.name || 'Staff Member',
-                role: mappedRole,
-                createdAt: profile.created_at || new Date().toISOString(),
-                avatarUrl: profile.avatar_url,
-                phoneNumber: profile.phone_number,
-                preferredLanguage: profile.preferred_language,
-              });
-            } else {
-              // Fallback if profile row is missing
-              setUser({
-                id: session.user.id,
-                email: session.user.email || '',
-                name: session.user.user_metadata?.name || 'Staff Member',
-                role: mappedRole,
-                createdAt: session.user.created_at || new Date().toISOString(),
-                avatarUrl: session.user.user_metadata?.avatarUrl,
-              });
-            }
+            setUser(userProfile);
           } else {
             // Only clear user if no active demo session in localStorage
             if (typeof window !== 'undefined' && !localStorage.getItem('stadium_os_demo_user')) {
@@ -137,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (!isMounted) return;
 
-            // Preserve active local demo user session
+            // Preserve active local demo user session if active
             if (typeof window !== 'undefined') {
               const activeDemoStr = localStorage.getItem('stadium_os_demo_user');
               if (activeDemoStr) {
@@ -166,13 +156,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
               if (!isMounted) return;
 
-              const rawRole = session.user.user_metadata?.role || profile?.role || 'organizer';
+              const profileRole = profile?.role;
+              const metadataRole = session.user.user_metadata?.role;
+              const rawRole = profileRole || metadataRole || 'visitor';
               const mappedRole = mapDbRoleToPortalRole(rawRole);
 
               setUser({
                 id: session.user.id,
                 email: session.user.email || '',
-                name: profile?.name || session.user.user_metadata?.name || 'Staff Member',
+                name: profile?.name || session.user.user_metadata?.name || (mappedRole === 'visitor' ? 'Visitor / Fan' : mappedRole === 'fifa' ? 'FIFA Executive' : 'Staff Member'),
                 role: mappedRole,
                 createdAt: profile?.created_at || session.user.created_at || new Date().toISOString(),
                 avatarUrl: profile?.avatar_url || session.user.user_metadata?.avatarUrl,
@@ -180,7 +172,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 preferredLanguage: profile?.preferred_language,
               });
             } else {
-              setUser(null);
+              if (typeof window !== 'undefined' && !localStorage.getItem('stadium_os_demo_user')) {
+                setUser(null);
+              }
             }
           });
 
@@ -447,6 +441,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 2. Production Supabase Sign In for real users
     if (isSupabaseConfigured && supabase) {
       try {
+        // Clear local demo user session when signing into Supabase
+        localStorage.removeItem('stadium_os_demo_user');
+
         const { error, data } = await supabase.auth.signInWithPassword({ email, password });
         if (error) return { success: false, error: error.message };
 
@@ -456,24 +453,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return { success: false, error: 'Please verify your email first.' };
           }
 
-          // Automatically store the mapped role in metadata upon login
+          // Authoritative role lookup from profiles table first, then metadata
           const { data: profile } = await supabase
             .from('profiles')
-            .select('role')
+            .select('*')
             .eq('id', data.user.id)
             .single();
           
-          const rawRole = data.user.user_metadata?.role || profile?.role || 'organizer';
+          const profileRole = profile?.role;
+          const metadataRole = data.user.user_metadata?.role;
+          const rawRole = profileRole || metadataRole || 'visitor';
           const mappedRole = mapDbRoleToPortalRole(rawRole);
 
-          await supabase.auth.updateUser({
-            data: { role: mappedRole }
-          }).catch(() => {});
-        }
+          const userProfile: UserProfile = {
+            id: data.user.id,
+            email: data.user.email || email,
+            name: profile?.name || data.user.user_metadata?.name || (mappedRole === 'visitor' ? 'Visitor / Fan' : mappedRole === 'fifa' ? 'FIFA Executive' : 'Staff Member'),
+            role: mappedRole,
+            createdAt: profile?.created_at || data.user.created_at || new Date().toISOString(),
+            avatarUrl: profile?.avatar_url || data.user.user_metadata?.avatarUrl,
+            phoneNumber: profile?.phone_number,
+            preferredLanguage: profile?.preferred_language,
+          };
 
-        // Clear local demo user session when signing into Supabase
-        localStorage.removeItem('stadium_os_demo_user');
-        return { success: true };
+          setUser(userProfile);
+          router.push(getDashboardForRole(mappedRole));
+          return { success: true };
+        }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Supabase signin failed';
         return { success: false, error: errorMsg };
