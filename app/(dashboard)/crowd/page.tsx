@@ -77,7 +77,7 @@ export default function CrowdIntelligencePage() {
                   wrapperStyle={{ paddingTop: '10px', fontSize: '12px' }}
                   formatter={(value) => <span className="text-slate-300 font-medium">{value}</span>}
                 />
-                <Bar name="Crowd Density (%)" dataKey="density" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={24} />
+                <Bar name="Crowd Density (%)" dataKey="density" fill="#06b6d4" radius={[4, 4, 0, 0]} barSize={24} />
                 <Bar name="Queue Time (mins)" dataKey="queueTime" fill="#f97316" radius={[4, 4, 0, 0]} barSize={24} />
               </BarChart>
             </ResponsiveContainer>

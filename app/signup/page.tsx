@@ -92,9 +92,11 @@ function SignupFormContent() {
                   {registeredEmail}
                 </div>
                 <div className="pt-2">
-                  <Button className="w-full" disabled={true}>
-                    Proceed to Sign In
-                  </Button>
+                  <Link href="/login">
+                    <Button className="w-full">
+                      Proceed to Sign In
+                    </Button>
+                  </Link>
                 </div>
               </>
             ) : (

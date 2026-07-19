@@ -659,9 +659,8 @@ export default function VisitorDashboard() {
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(msg.sender === 'user' ? 14 : 16, msg.sender === 'user' ? 165 : 185, msg.sender === 'user' ? 233 : 129);
         doc.text(label, 15, yPos);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(220, 225, 230);
-        const lines = doc.splitTextToSize(msg.content, 160);
+        const cleanText = msg.content.replace(/[^\x00-\x7F]/g, '');
+        const lines = doc.splitTextToSize(cleanText || msg.content, 160);
         doc.text(lines, 38, yPos);
         yPos += lines.length * 6 + 4;
       });
@@ -2041,7 +2040,9 @@ export default function VisitorDashboard() {
                           }`}>
                             <p className="leading-relaxed text-[11px] whitespace-pre-wrap">{msg.content}</p>
                             <span className="block text-[8px] text-slate-500 text-right mt-1.5 font-mono">
-                              {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {isNaN(new Date(msg.timestamp).getTime())
+                                ? msg.timestamp
+                                : new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
                         </motion.div>

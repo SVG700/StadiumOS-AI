@@ -328,8 +328,11 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
   const sidebarItems = getSidebarItems();
   const brand = getBrandDetails();
-  const unreadCount = notifications.filter((n) => !n.read).length;
-  const filteredNotifs = notifications.filter(
+  const userNotifs = notifications.filter(
+    (n) => user.role !== 'visitor' || n.type === 'visitor' || (n as { userEmail?: string }).userEmail === user.email
+  );
+  const unreadCount = userNotifs.filter((n) => !n.read).length;
+  const filteredNotifs = userNotifs.filter(
     (n) => notifFilter === 'all' || n.type === notifFilter
   );
 
