@@ -801,7 +801,7 @@ export const StadiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const unique = updated.filter((item, idx, self) => 
         self.findIndex(t => t.message === item.message && t.timestamp === item.timestamp) === idx
       );
-      const sliced = unique.slice(0, 25);
+      const sliced = unique.slice(0, 10);
       localStorage.setItem('stadium_notifications', JSON.stringify(sliced));
       return sliced;
     });
