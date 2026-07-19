@@ -9,7 +9,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { 
   Users, ShieldAlert, Clock, UserCheck, PlusCircle, 
-  RefreshCw, ClipboardList, AlertOctagon, CheckSquare, CheckCircle, Leaf
+  RefreshCw, ClipboardList, AlertOctagon, CheckSquare, CheckCircle, Leaf, Trophy
 } from 'lucide-react';
 
 export default function StaffDashboard() {
@@ -128,6 +128,32 @@ export default function StaffDashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Match Information Banner */}
+      <Card className="bg-[#080d19]/45 border-slate-900/60 p-3.5 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+            <Trophy className="h-4.5 w-4.5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-extrabold text-white">Argentina vs Germany</span>
+              <Badge variant="cyan" className="text-[9px] uppercase font-mono px-1.5 py-0">Quarter Final</Badge>
+            </div>
+            <p className="text-[10px] text-slate-400">Stadium Alpha • Kickoff in 1h 24m • Match Ref: P. Maza (Chile)</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 text-xs font-mono shrink-0">
+          <div className="text-right">
+            <span className="text-[9px] text-slate-500 block uppercase">Crowd Footprint</span>
+            <span className="text-slate-200 font-bold">{visitors.total.toLocaleString()} ({Math.round((visitors.total / 70000) * 100)}%)</span>
+          </div>
+          <div className="text-right">
+            <span className="text-[9px] text-slate-500 block uppercase">Active Workforce</span>
+            <span className="text-emerald-400 font-bold">{visitors.staff} Staff</span>
+          </div>
+        </div>
+      </Card>
 
       {/* OPERATIONAL SUMMARY STATS ROW */}
       <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">

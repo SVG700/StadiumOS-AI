@@ -53,9 +53,9 @@ export default function AccessibilityPage() {
           </CardHeader>
           <CardContent className="p-4 space-y-3">
             {[
-              { id: '1', request: 'Wheelchair Transfer Escort', location: 'Gate 1 Dropoff', user: 'fan1@example.com', time: '10 mins ago', assignee: 'Sarah M.', status: 'in-progress' as const },
-              { id: '2', request: 'Sensory Kit Request', location: 'Suite 24 Entrance', user: 'fan2@example.com', time: '2 mins ago', status: 'pending' as const },
-              { id: '3', request: 'Audio Guide Headset Setup', location: 'Info Desk North', user: 'fan3@example.com', time: '30 mins ago', assignee: 'David K.', status: 'completed' as const }
+              { id: '1', request: 'Wheelchair Transfer Escort', location: 'Gate 1 Dropoff', user: 'Visitor #2481', time: '10 mins ago', assignee: 'Sarah M.', status: 'in-progress' as const },
+              { id: '2', request: 'Sensory Kit Request', location: 'Suite 24 Entrance', user: 'Visitor #3810', time: '2 mins ago', status: 'pending' as const },
+              { id: '3', request: 'Audio Guide Headset Setup', location: 'Info Desk North', user: 'Visitor #1942', time: '30 mins ago', assignee: 'David K.', status: 'completed' as const }
             ].map((ticket) => (
               <div key={ticket.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-800 bg-[#080d19]/35 text-xs">
                 <div className="flex items-start gap-3">
