@@ -1,32 +1,34 @@
-# ⚽ StadiumOS AI
-### AI-Powered Smart Stadium Operations Platform for FIFA World Cup 2026
+# 🏟️ StadiumOS AI — FIFA World Cup 2026 Smart Stadium Operating Platform
+
+<p align="center">
+  <img src="screenshots/landing-page.png" alt="StadiumOS AI Landing Page" width="100%">
+</p>
+
+<p align="center">
+  <b>An AI-powered Smart Stadium Operations Platform built for FIFA World Cup 2026.</b><br>
+  Enhancing fan experience, workforce coordination, venue operations, sustainability, and executive decision-making through Generative AI.
+</p>
 
 <p align="center">
 
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
-![Supabase](https://img.shields.io/badge/Supabase-Auth-3ECF8E?logo=supabase)
-![Gemini](https://img.shields.io/badge/Google-Gemini_AI-4285F4?logo=google)
-![License](https://img.shields.io/badge/License-MIT-success)
+![Supabase](https://img.shields.io/badge/Supabase-Backend-3ECF8E?logo=supabase)
+![Gemini](https://img.shields.io/badge/Google-Gemini-blue?logo=google)
+![License](https://img.shields.io/badge/License-MIT-green)
 
 </p>
 
 ---
 
-# 🌍 Overview
+# 🌍 Vision
 
-**StadiumOS AI** is an AI-powered Smart Stadium Management Platform built for the **FIFA World Cup 2026**.
+Large sporting events like the **FIFA World Cup** involve millions of spectators, thousands of volunteers, security personnel, transportation teams, accessibility coordinators, and executive staff.
 
-It unifies:
+Most current stadium systems operate independently.
 
-- 👥 Spectator Experience
-- 🏟 Stadium Operations
-- 🌎 FIFA Executive Monitoring
-
-into a single intelligent platform powered by **Google Gemini AI**, **Supabase**, **Next.js**, and real-time operational simulations.
-
-The platform helps reduce crowd congestion, improve accessibility, streamline transportation, assist stadium staff, and provide executives with live operational intelligence.
+**StadiumOS AI** unifies every stakeholder into a single intelligent platform powered by **Google Gemini AI**, **Supabase**, and **Next.js**.
 
 ---
 
@@ -34,149 +36,164 @@ The platform helps reduce crowd congestion, improve accessibility, streamline tr
 
 Built for:
 
-> **PromptWars Challenge 4 — Smart Stadiums & Tournament Operations**
+**PromptWars Challenge 4 — Smart Stadiums & Tournament Operations**
 
-The solution addresses:
+The platform uses **Generative AI** to improve:
 
-- ✅ Crowd Management
-- ✅ Indoor Navigation
-- ✅ Accessibility Assistance
-- ✅ Sustainability
-- ✅ Transportation
-- ✅ Emergency Operations
-- ✅ AI Decision Support
-- ✅ Multilingual Fan Assistance
-- ✅ Stadium Intelligence
-
----
-
-# ✨ Key Features
-
-## 👤 Visitor Portal
-
-Designed for football fans attending matches.
-
-### Features
-
-- 🎫 Digital Match Tickets
-- 🤖 FIFA Fan AI Assistant (Gemini)
-- 🗺 Indoor Smart Navigation
-- 🚇 Public Transport Guidance
-- 🍔 Food Pre-ordering
-- 🛍 Merchandise Reservations
-- ♿ Accessibility Requests
-- 🔔 Personalized Notifications
-- 🌱 Sustainability Dashboard
-- 👤 Profile Management
+- 🧭 Stadium Navigation
+- 👥 Crowd Intelligence
+- 🚑 Emergency Response
+- 🚆 Transportation
+- ♿ Accessibility
+- 🌱 Sustainability
+- 🌍 Multilingual Assistance
+- 🤖 AI Decision Support
+- 📊 Executive Operations
 
 ---
 
-## 🏟 Staff Operations Portal
-
-Built for stadium volunteers and operations teams.
-
-### Features
-
-- 📊 Live Crowd Monitoring
-- 🚨 Emergency Dispatch
-- 🚇 Transport Operations
-- ♿ Accessibility Desk
-- 🤖 AI Operations Assistant
-- 📍 Staff Navigation Console
-- 📈 Operational Analytics
-- 🔔 Live Alerts
-
----
-
-## 🌎 FIFA Executive Portal
-
-Designed for tournament organizers.
-
-### Features
-
-- 🌍 Multi-Stadium Monitoring
-- 📈 Tournament Analytics
-- ⚡ Digital Twin Simulation
-- 🌱 Sustainability Reports
-- 📊 Executive Dashboards
-- 🤖 AI Insights
-- 📄 Incident Reports
-
----
-
-# 🤖 AI Features
-
-Powered by **Google Gemini AI**
-
-The AI assistant provides:
-
-- Stadium Navigation
-- Operational Recommendations
-- Emergency Guidance
-- Accessibility Support
-- Fan Assistance
-- Match Information
-- Context-Aware Conversations
-
----
-
-# 🏗 Architecture
+# 🏗️ System Architecture
 
 ```
-                         StadiumOS AI
-
-           ┌──────────────────────────────────┐
-           │        Next.js Frontend          │
-           └──────────────┬───────────────────┘
-                          │
-        ┌─────────────────┼─────────────────┐
-        │                 │                 │
-        ▼                 ▼                 ▼
-
- Visitor Portal     Staff Portal      FIFA Portal
-
-        │                 │                 │
-        └──────────────┬────────────────────┘
-                       ▼
-
-              Stadium Context Engine
-
-                       ▼
-
-          Google Gemini AI Assistant
-
-                       ▼
-
-               Supabase Backend
-
-          Authentication • Database
-
+                     ┌──────────────────────────────┐
+                     │      StadiumOS AI Portal     │
+                     │      Next.js + React 19      │
+                     └─────────────┬────────────────┘
+                                   │
+              ┌────────────────────┼────────────────────┐
+              │                    │                    │
+              ▼                    ▼                    ▼
+      Visitor Portal        Staff Portal        FIFA Executive
+              │                    │                    │
+              └──────────────┬─────┴────────────────────┘
+                             ▼
+                  Google Gemini AI Assistant
+                             │
+                             ▼
+                 Supabase Authentication
+                             │
+                             ▼
+                  PostgreSQL + User Profiles
 ```
 
 ---
 
-# 🛠 Tech Stack
+# 📸 Application Screenshots
 
-### Frontend
+## 🏠 Landing Page
 
-- Next.js 15
-- React 19
-- TypeScript
-- Framer Motion
-- Lucide Icons
+![Landing](screenshots/landing-page.png)
 
-### Backend
+---
 
-- Supabase Authentication
-- Supabase Database
+## 🔐 Login Portal
 
-### AI
+![Login](screenshots/login-page.png)
 
-- Google Gemini API
+---
 
-### Deployment
+## 🎟️ Visitor Dashboard
 
-- Vercel
+![Visitor Dashboard](screenshots/visitor-dashboard.png)
+
+---
+
+## 🗺️ Smart Stadium Navigation
+
+![Navigation](screenshots/ticket-navigation.png)
+
+---
+
+## 🤖 AI Stadium Assistant
+
+![AI Assistant](screenshots/ai-assistant.png)
+
+---
+
+## 👷 Staff Operations Dashboard
+
+![Staff Dashboard](screenshots/staff-dashboard.png)
+
+---
+
+## 🏆 FIFA Executive Dashboard
+
+![FIFA Dashboard](screenshots/fifa-dashboard.png)
+
+---
+
+## 📊 Crowd Intelligence & Analytics
+
+![Analytics](screenshots/analytics-dashboard.png)
+
+---
+
+# 👥 User Portals
+
+## 🎟️ Visitor Portal
+
+Features include:
+
+- AI Stadium Assistant
+- Digital Match Tickets
+- QR Entry Pass
+- Merchandise Reservation
+- Food Pre-order
+- Accessibility Requests
+- Smart Navigation
+- Transportation Guidance
+- Notifications
+- Profile Management
+
+---
+
+## 👷 Staff Operations Portal
+
+Designed for stadium workforce.
+
+Includes:
+
+- Match Operations Console
+- Crowd Monitoring
+- Emergency Dispatch
+- Transport Operations
+- Accessibility Desk
+- AI Operations Assistant
+- Indoor Navigation
+- Incident Management
+
+---
+
+## 🏆 FIFA Executive Portal
+
+Tournament-wide command center.
+
+Provides:
+
+- Multi-Stadium Monitoring
+- Sustainability Analytics
+- Carbon Footprint Dashboard
+- Executive AI Assistant
+- Global Incident Reports
+- Venue Comparison
+- Tournament KPIs
+
+---
+
+# 🤖 AI Capabilities
+
+Powered by **Google Gemini**.
+
+Supports:
+
+- Natural Language Queries
+- Stadium Operations Guidance
+- Crowd Flow Analysis
+- Emergency Recommendations
+- Executive Insights
+- Accessibility Assistance
+- Fan Support
+- Route Suggestions
 
 ---
 
@@ -184,124 +201,158 @@ The AI assistant provides:
 
 Supports two modes:
 
-## Production Mode
+### Production Mode
 
-- Email Authentication
+- Supabase Authentication
 - Email Verification
 - Secure Sessions
-- User Isolation
+- User Data Isolation
+- Role-based Routing
 
-## Demo Mode
+### Demo Mode
 
-Includes dedicated demo portals:
+Instant access for:
 
-- Visitor Demo
-- Staff Demo
-- FIFA Executive Demo
+- Visitor
+- Staff
+- FIFA Executive
 
-No production data is exposed.
-
----
-
-# 🔐 User Data Isolation
-
-Every authenticated user receives isolated data storage.
-
-Stored separately per user:
-
-- Tickets
-- AI Chat History
-- Notifications
-- Merchandise Orders
-- Food Orders
-- Accessibility Requests
-- User Preferences
-
-No demo data leaks into production accounts.
+without requiring authentication.
 
 ---
 
-# 📊 Smart Stadium Modules
+# 🛠️ Tech Stack
 
-- Crowd Intelligence
-- Emergency Dispatch
-- Logistics Management
-- Sustainability Monitoring
-- Accessibility Services
-- Indoor Navigation
-- Operations AI
-- Executive Analytics
+### Frontend
 
----
+- Next.js 15
+- React 19
+- TypeScript
+- Tailwind CSS
+- Framer Motion
+- Lucide Icons
 
-# 🌱 Sustainability Features
+### Backend
 
-- Recycling Tracking
-- Water Usage Monitoring
-- Carbon Footprint
-- Energy Grid Insights
-- Eco Rewards
+- Supabase
+- PostgreSQL
+- Authentication
+- Row Level Security
 
----
+### AI
 
-# 📂 Project Structure
+- Google Gemini API
 
-```
-app/
-components/
-contexts/
-hooks/
-lib/
-public/
-styles/
+### Charts
 
-```
+- Recharts
+
+### Deployment
+
+- Vercel
 
 ---
 
-# 🚀 Getting Started
+# ✨ Key Features
 
-## Clone Repository
+## 🧭 Smart Navigation
+
+- Indoor routing
+- Medical locations
+- Emergency exits
+- Gate guidance
+
+---
+
+## 🚦 Crowd Intelligence
+
+- Queue monitoring
+- Density prediction
+- AI alerts
+
+---
+
+## 🚑 Emergency Operations
+
+- Incident tracking
+- Dispatch teams
+- Medical routing
+
+---
+
+## 🚆 Transportation
+
+- Metro updates
+- Shuttle monitoring
+- Parking guidance
+
+---
+
+## ♿ Accessibility
+
+- Wheelchair requests
+- Sensory kits
+- Volunteer escort
+- Audio assistance
+
+---
+
+## 🌱 Sustainability
+
+- Carbon monitoring
+- Recycling metrics
+- Energy analytics
+
+---
+
+## 🤖 AI Copilot
+
+Role-specific assistants for:
+
+- Visitors
+- Staff
+- FIFA Executives
+
+---
+
+# 🔐 Security
+
+- Secure Authentication
+- Protected Routes
+- Role-based Authorization
+- User Data Isolation
+- Email Verification
+- Session Validation
+
+---
+
+# 🚀 Installation
+
+Clone the repository
 
 ```bash
 git clone https://github.com/SVG700/StadiumOS-AI.git
+```
 
+Navigate into the project
+
+```bash
 cd StadiumOS-AI
 ```
 
----
-
-## Install Dependencies
+Install dependencies
 
 ```bash
 npm install
 ```
 
----
+Create environment variables
 
-## Configure Environment
-
-Create
-
-```
-.env.local
+```bash
+cp .env.example .env.local
 ```
 
-Example:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=
-
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-
-GEMINI_API_KEY=
-```
-
-If no environment variables are configured, the application automatically switches to **Demo Mode**.
-
----
-
-## Run Development Server
+Run locally
 
 ```bash
 npm run dev
@@ -309,37 +360,27 @@ npm run dev
 
 ---
 
-## Production Validation
+# 🧪 Validation
 
-Run:
+The project successfully passes:
 
 ```bash
 npm run lint
+```
 
+✅ ESLint
+
+```bash
 npx tsc --noEmit
+```
 
+✅ TypeScript
+
+```bash
 npm run build
 ```
 
-The project is validated with:
-
-- ✅ 0 TypeScript Errors
-- ✅ 0 ESLint Errors
-- ✅ Successful Production Build
-
----
-
-# 📸 Screenshots
-
-> Add screenshots here
-
-- Landing Page
-
-- Visitor Portal
-
-- Staff Dashboard
-
-- FIFA Executive Console
+✅ Production Build
 
 ---
 
@@ -351,19 +392,13 @@ https://stadium-os-ai-topaz.vercel.app/
 
 ---
 
-# 📂 GitHub Repository
+# 📂 Repository
 
 https://github.com/SVG700/StadiumOS-AI
 
 ---
 
-# 🎥 Demo Video
-
-> Add YouTube / Drive Link here
-
----
-
-# 👨‍💻 Developed By
+# 👨‍💻 Developer
 
 **Samhith V Gupta**
 
@@ -371,33 +406,14 @@ B.Tech Computer Science Engineering
 
 Presidency University, Bengaluru
 
-GitHub
-
+GitHub:
 https://github.com/SVG700
 
-LinkedIn
-
-https://www.linkedin.com/in/samhith-8344272a3/
-
----
-
-# 🚀 Future Roadmap
-
-- Computer Vision Crowd Detection
-- IoT Sensor Integration
-- Live CCTV Analytics
-- Predictive Crowd AI
-- Digital Twin Expansion
-- Volunteer Mobile App
-- Wearable Device Support
-- AI Incident Forecasting
+LinkedIn:
+https://www.linkedin.com/in/samhith-v-gupta-302740392
 
 ---
 
-# 📄 License
+# ⭐ If you like this project
 
-This project is released under the **MIT License**.
-
----
-
-## ⭐ If you like this project, consider giving it a Star!
+Give this repository a ⭐ on GitHub!
