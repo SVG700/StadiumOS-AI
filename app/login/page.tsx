@@ -405,15 +405,15 @@ function LoginFormContent() {
           ) : selectedPortal === 'staff' ? (
             <>
               Need a credentials clearance?{' '}
-              <Link href="/signup?role=staff" className="font-semibold text-cyan-400 hover:text-cyan-300 hover:underline">
+              <Link href="/signup/staff-access" className="font-semibold text-cyan-400 hover:text-cyan-300 hover:underline">
                 Request Staff Account
               </Link>
             </>
           ) : (
             <>
               Need a credentials clearance?{' '}
-              <Link href="/signup?role=fifa" className="font-semibold text-cyan-400 hover:text-cyan-300 hover:underline">
-                Request FIFA Account
+              <Link href="/signup/fifa-access" className="font-semibold text-cyan-400 hover:text-cyan-300 hover:underline">
+                Request FIFA Board Account
               </Link>
             </>
           )}
