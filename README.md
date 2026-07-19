@@ -1,156 +1,403 @@
-# StadiumOS AI — FIFA World Cup 2026 Smart Operating Platform
+# ⚽ StadiumOS AI
+### AI-Powered Smart Stadium Operations Platform for FIFA World Cup 2026
 
-StadiumOS AI is a next-generation unified stadium operations command console and fan experience platform designed for the FIFA World Cup 2026. It leverages real-time telemetry, predictive analytics, computer vision simulations, and generative AI agent routing to streamline venue operations, crowd bottlenecks, medical responses, transport dispatch, and accessibility assistance.
+<p align="center">
 
----
+![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
+![Supabase](https://img.shields.io/badge/Supabase-Auth-3ECF8E?logo=supabase)
+![Gemini](https://img.shields.io/badge/Google-Gemini_AI-4285F4?logo=google)
+![License](https://img.shields.io/badge/License-MIT-success)
 
-## 📖 Table of Contents
-- [Vision & Problem Statement Alignment](#-vision--problem-statement-alignment)
-- [System Architecture](#%EF%B8%8F-system-architecture)
-- [Product Portals](#-product-portals)
-  - [1. Spectator / Fan Portal](#1-spectator--fan-portal)
-  - [2. Operations & Workforce Portal](#2-operations--workforce-portal)
-  - [3. FIFA Board & Executive Console](#3-fifa-board--executive-console)
-- [Core AI & Telemetry Engines](#-core-ai--telemetry-engines)
-  - [Operations Copilot](#operations-copilot)
-  - [Digital Twin Simulation](#digital-twin-simulation)
-- [Verification & Production Hardening](#-verification--production-hardening)
-- [Setup & Installation](#-setup--installation)
+</p>
 
 ---
 
-## 🎯 Vision & Problem Statement Alignment
-Large-scale tournament venues (like the 8 host stadiums of the FIFA World Cup 2026) suffer from fragmented management utilities. Security, queueing flow, transport dispatch, and sustainability metrics are typically handled in siloed offline tools. 
+# 🌍 Overview
 
-**StadiumOS AI** solves this by consolidating three separate operating domains into a unified web application:
-1. **Fan Comfort & Direction**: Real-time accessible navigation, transit indicators, and an AI Operations Assistant.
-2. **Operational Workforce Control**: Real-time crowd bottleneck telemetry, volunteer task assignments, and instant emergency squad dispatching.
-3. **FIFA Executive Intelligence**: High-level tournament analytics, multi-stadium carbon ledgers, and automated incident resolution history records.
+**StadiumOS AI** is an AI-powered Smart Stadium Management Platform built for the **FIFA World Cup 2026**.
+
+It unifies:
+
+- 👥 Spectator Experience
+- 🏟 Stadium Operations
+- 🌎 FIFA Executive Monitoring
+
+into a single intelligent platform powered by **Google Gemini AI**, **Supabase**, **Next.js**, and real-time operational simulations.
+
+The platform helps reduce crowd congestion, improve accessibility, streamline transportation, assist stadium staff, and provide executives with live operational intelligence.
 
 ---
 
-## 🕹️ System Architecture
+# 🎯 Challenge Alignment
+
+Built for:
+
+> **PromptWars Challenge 4 — Smart Stadiums & Tournament Operations**
+
+The solution addresses:
+
+- ✅ Crowd Management
+- ✅ Indoor Navigation
+- ✅ Accessibility Assistance
+- ✅ Sustainability
+- ✅ Transportation
+- ✅ Emergency Operations
+- ✅ AI Decision Support
+- ✅ Multilingual Fan Assistance
+- ✅ Stadium Intelligence
+
+---
+
+# ✨ Key Features
+
+## 👤 Visitor Portal
+
+Designed for football fans attending matches.
+
+### Features
+
+- 🎫 Digital Match Tickets
+- 🤖 FIFA Fan AI Assistant (Gemini)
+- 🗺 Indoor Smart Navigation
+- 🚇 Public Transport Guidance
+- 🍔 Food Pre-ordering
+- 🛍 Merchandise Reservations
+- ♿ Accessibility Requests
+- 🔔 Personalized Notifications
+- 🌱 Sustainability Dashboard
+- 👤 Profile Management
+
+---
+
+## 🏟 Staff Operations Portal
+
+Built for stadium volunteers and operations teams.
+
+### Features
+
+- 📊 Live Crowd Monitoring
+- 🚨 Emergency Dispatch
+- 🚇 Transport Operations
+- ♿ Accessibility Desk
+- 🤖 AI Operations Assistant
+- 📍 Staff Navigation Console
+- 📈 Operational Analytics
+- 🔔 Live Alerts
+
+---
+
+## 🌎 FIFA Executive Portal
+
+Designed for tournament organizers.
+
+### Features
+
+- 🌍 Multi-Stadium Monitoring
+- 📈 Tournament Analytics
+- ⚡ Digital Twin Simulation
+- 🌱 Sustainability Reports
+- 📊 Executive Dashboards
+- 🤖 AI Insights
+- 📄 Incident Reports
+
+---
+
+# 🤖 AI Features
+
+Powered by **Google Gemini AI**
+
+The AI assistant provides:
+
+- Stadium Navigation
+- Operational Recommendations
+- Emergency Guidance
+- Accessibility Support
+- Fan Assistance
+- Match Information
+- Context-Aware Conversations
+
+---
+
+# 🏗 Architecture
 
 ```
-                  ┌────────────────────────────────────────────────────────┐
-                  │                 Unified Client Portal                  │
-                  │              (React 19, Next.js Dashboard)             │
-                  └───────────┬────────────────────────────────┬───────────┘
-                              │                                │
-      (Secure Whitelists)     ▼                                ▼     (AI Action Stream)
-   ┌─────────────────────────────────────┐         ┌─────────────────────────────────────┐
-   │        Role Router Guard            │         │        AI Operations Copilot        │
-   │   (/visitor, /staff, /fifa)         │         │        (Google Gemini API)          │
-   └──────────────────┬──────────────────┘         └──────────────────┬──────────────────┘
-                      │                                               │
-                      ▼                                               ▼
-   ┌─────────────────────────────────────────────────────────────────────────────────────┐
-   │                                  StadiumContext                                     │
-   │               (Central State, Global Telemetry & Notification Engine)               │
-   └──────────────────┬───────────────────────────────────────────────┬──────────────────┘
-                      │                                               │
-                      ▼                                               ▼
-   ┌─────────────────────────────────────┐         ┌─────────────────────────────────────┐
-   │         Supabase Database           │         │      AI Digital Twin Simulator      │
-   │     (Postgres, Auth & Profiles)     │         │       (18s Telemetry Interval)      │
-   └─────────────────────────────────────┘         └─────────────────────────────────────┘
+                         StadiumOS AI
+
+           ┌──────────────────────────────────┐
+           │        Next.js Frontend          │
+           └──────────────┬───────────────────┘
+                          │
+        ┌─────────────────┼─────────────────┐
+        │                 │                 │
+        ▼                 ▼                 ▼
+
+ Visitor Portal     Staff Portal      FIFA Portal
+
+        │                 │                 │
+        └──────────────┬────────────────────┘
+                       ▼
+
+              Stadium Context Engine
+
+                       ▼
+
+          Google Gemini AI Assistant
+
+                       ▼
+
+               Supabase Backend
+
+          Authentication • Database
+
 ```
 
-### Stack Highlights
-- **Core Framework**: Next.js 15+ & React 19 (fully optimized for Next.js Turbopack)
-- **Styling**: Vanilla CSS custom themes configured with glassmorphic cards and HSL-tailored dark modes
-- **State Ingestion**: Unified React Context (`StadiumContext`) driving real-time mock telemetry and notification sound synths
-- **Data & Auth**: Supabase Postgres Auth + custom profile mappings, with a fully offline Local Demo Mode fallback
+---
+
+# 🛠 Tech Stack
+
+### Frontend
+
+- Next.js 15
+- React 19
+- TypeScript
+- Framer Motion
+- Lucide Icons
+
+### Backend
+
+- Supabase Authentication
+- Supabase Database
+
+### AI
+
+- Google Gemini API
+
+### Deployment
+
+- Vercel
 
 ---
 
-## 🌐 Product Portals
+# 🔒 Authentication
 
-### 1. Spectator / Fan Portal
-Designed to assist football fans with matchday navigation and services:
-- **Smart Navigation**: Highlight seats, restrooms, concessions, and medical bays.
-- **Logistics Guidance**: Live shuttle frequencies, metro status, and parking congestion scales.
-- **Accessibility Desk**: Request companion escorts, assistive wheelchairs, or book sensory suite seating.
-- **Sustainability Hub**: Track individual eco-points accumulated from recycling bottles or using public transit.
+Supports two modes:
 
-### 2. Operations & Workforce Portal
-The operational cockpit for stadium volunteers, logistics crews, and safety supervisors:
-- **Crowd Intelligence**: Real-time computer vision simulation representing entry gates, seating bowls, and concourses.
-- **Emergency Dispatch**: Activate sirens and coordinate response squads (Medical, Security, Logistics) to target corridors.
-- **Workforce Tasks**: View volunteer checklists, task completion history, and dispatch new chores in real time.
-- **Action Search**: Instantly look up telemetry logs, task items, or user names using the unified filters.
+## Production Mode
 
-### 3. FIFA Board & Executive Console
-High-level overview for tournament directors managing multiple host cities:
-- **Global Command Center**: Toggle between 8 major World Cup stadiums (e.g. MetLife, BC Place, Azteca) to instantly load regional telemetry.
-- **Digital Twin Simulation**: View real-time adjustments to crowd densities, weather sensors, and solar grid outputs.
-- **AI Playbook Approvals**: Review automated AI response playbooks to mitigate incoming incidents (e.g. routing overflow from Gate 3 to Gate 4).
-- **Incident History & PDF Reports**: Generate comprehensive After-Action Reports (AAR) summarizing incident causes, lessons learned, and future venue guidelines.
+- Email Authentication
+- Email Verification
+- Secure Sessions
+- User Isolation
+
+## Demo Mode
+
+Includes dedicated demo portals:
+
+- Visitor Demo
+- Staff Demo
+- FIFA Executive Demo
+
+No production data is exposed.
 
 ---
 
-## 🧠 Core AI & Telemetry Engines
+# 🔐 User Data Isolation
 
-### Operations Copilot
-Powered by **Google Gemini API**, the Operations Copilot acts as a context-aware operational assistant.
-- **Command Palette (Ctrl + K)**: Execute administrative tasks instantly, such as dispatching medical units, dimming advertising screens to stabilize the solar grid, or rerouting transport fleets.
-- **Interactive Chat**: Consult the copilot on live crowd densities, transport ETAs, or emergency playbooks.
+Every authenticated user receives isolated data storage.
 
-### Digital Twin Simulation
-The platform runs a background telemetry simulation loop every 18 seconds:
-- Fluctuate weather and wind patterns dynamically.
-- Simulate random incident escalations (e.g. grid power drops or entry bottlenecks).
-- Propagate incident states automatically through their lifecycle: `Detected ➔ Assigned ➔ Responding ➔ Contained ➔ Resolved ➔ Archived`.
-- Auto-generate incident history reviews on resolution.
+Stored separately per user:
 
----
+- Tickets
+- AI Chat History
+- Notifications
+- Merchandise Orders
+- Food Orders
+- Accessibility Requests
+- User Preferences
 
-## 🔒 Verification & Production Hardening
-StadiumOS AI is designed and validated to meet strict enterprise guidelines:
-- **Zero Errors / Warnings**: The build console is 100% clean, compiling with `0 errors` and `0 warnings` under Next.js production checks.
-- **React 19 Compliance**: Avoids synchronous state setters inside effects, isolates impure math (timestamps/random loops) outside JSX, and utilizes memoized handlers (`useCallback` / `useMemo`) to prevent cascading render sweeps.
-- **Auth Guard whitelists**: Restricts page access strictly based on user profiles (`visitor`, `staff`, `fifa`) via React layouts. Unauthorized navigation is immediately rerouted to `/access-denied`.
-- **Validation Tests**: Backed by a custom telemetry assertion suite.
+No demo data leaks into production accounts.
 
 ---
 
-## ⚙️ Setup & Installation
+# 📊 Smart Stadium Modules
 
-### 1. Prerequisites
-- Node.js v18.x or later installed.
-- (Optional) A Supabase project and a Gemini API key.
+- Crowd Intelligence
+- Emergency Dispatch
+- Logistics Management
+- Sustainability Monitoring
+- Accessibility Services
+- Indoor Navigation
+- Operations AI
+- Executive Analytics
 
-### 2. Clone and Install
+---
+
+# 🌱 Sustainability Features
+
+- Recycling Tracking
+- Water Usage Monitoring
+- Carbon Footprint
+- Energy Grid Insights
+- Eco Rewards
+
+---
+
+# 📂 Project Structure
+
+```
+app/
+components/
+contexts/
+hooks/
+lib/
+public/
+styles/
+
+```
+
+---
+
+# 🚀 Getting Started
+
+## Clone Repository
+
 ```bash
-# Clone the repository
 git clone https://github.com/SVG700/StadiumOS-AI.git
-cd StadiumOS-AI
 
-# Install dependencies
+cd StadiumOS-AI
+```
+
+---
+
+## Install Dependencies
+
+```bash
 npm install
 ```
 
-### 3. Configure Variables
-Copy `.env.example` to `.env.local` and add your keys:
-```bash
-cp .env.example .env.local
+---
+
+## Configure Environment
+
+Create
+
 ```
-*Note: If `.env.local` is empty or missing, StadiumOS AI automatically runs in **Local Demo Mode** using secure local-storage accounts.*
-
-### 4. Run Verification Checks
-```bash
-# Run unit tests
-npm run test
-
-# Run ESLint validation
-npm run lint
-
-# Compile and check TypeScript types
-npx tsc --noEmit
+.env.local
 ```
 
-### 5. Start Development
+Example:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+
+GEMINI_API_KEY=
+```
+
+If no environment variables are configured, the application automatically switches to **Demo Mode**.
+
+---
+
+## Run Development Server
+
 ```bash
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) to view the portal.
+
+---
+
+## Production Validation
+
+Run:
+
+```bash
+npm run lint
+
+npx tsc --noEmit
+
+npm run build
+```
+
+The project is validated with:
+
+- ✅ 0 TypeScript Errors
+- ✅ 0 ESLint Errors
+- ✅ Successful Production Build
+
+---
+
+# 📸 Screenshots
+
+> Add screenshots here
+
+- Landing Page
+
+- Visitor Portal
+
+- Staff Dashboard
+
+- FIFA Executive Console
+
+---
+
+# 🌐 Live Demo
+
+**Application**
+
+https://stadium-os-ai-topaz.vercel.app/
+
+---
+
+# 📂 GitHub Repository
+
+https://github.com/SVG700/StadiumOS-AI
+
+---
+
+# 🎥 Demo Video
+
+> Add YouTube / Drive Link here
+
+---
+
+# 👨‍💻 Developed By
+
+**Samhith V Gupta**
+
+B.Tech Computer Science Engineering
+
+Presidency University, Bengaluru
+
+GitHub
+
+https://github.com/SVG700
+
+LinkedIn
+
+https://www.linkedin.com/in/samhith-8344272a3/
+
+---
+
+# 🚀 Future Roadmap
+
+- Computer Vision Crowd Detection
+- IoT Sensor Integration
+- Live CCTV Analytics
+- Predictive Crowd AI
+- Digital Twin Expansion
+- Volunteer Mobile App
+- Wearable Device Support
+- AI Incident Forecasting
+
+---
+
+# 📄 License
+
+This project is released under the **MIT License**.
+
+---
+
+## ⭐ If you like this project, consider giving it a Star!
