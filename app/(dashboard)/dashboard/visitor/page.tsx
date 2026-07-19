@@ -50,6 +50,13 @@ interface MatchTicket {
   orderId?: string;
 }
 
+type ChatMessage = {
+  id: string;
+  sender: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+};
+
 export default function VisitorDashboard() {
   const { user } = useAuth();
   const { 
@@ -87,7 +94,7 @@ export default function VisitorDashboard() {
   // AI Assistant states
   const [isAiOpen, setIsAiOpen] = useState(false);
   const [aiInput, setAiInput] = useState('');
-  const [aiMessages, setAiMessages] = useState<{ id: string; sender: 'user' | 'assistant'; content: string; timestamp: string }[]>([]);
+  const [aiMessages, setAiMessages] = useState<ChatMessage[]>([]);
   const [aiThinking, setAiThinking] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -168,7 +175,14 @@ export default function VisitorDashboard() {
     setMerchReserved(itemId);
     const now = new Date();
     const formatted = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) + ' ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-    setMerchReservedTime(prev => ({ ...prev, [itemId]: formatted }));
+    setMerchReservedTime(prev => {
+      const updated = { ...prev, [itemId]: formatted };
+      if (user) {
+        localStorage.setItem(`stadium_merch_reserved_${user.id}`, itemId);
+        localStorage.setItem(`stadium_merch_reserved_time_${user.id}`, JSON.stringify(updated));
+      }
+      return updated;
+    });
   };
 
   // Currency & Pricing helpers
@@ -340,12 +354,61 @@ export default function VisitorDashboard() {
     }
   };
 
-  const handleRequestService = (type: 'wheelchair' | 'guide' | 'sensory' | 'sign-language') => {
+  // Volunteer Dispatcher simulation
+  const handleRequestVolunteer = useCallback(() => {
+    setVolunteerStatus('requested');
+    if (user) {
+      localStorage.setItem(`stadium_volunteer_status_${user.id}`, 'requested');
+    }
+    setTimeout(() => {
+      setVolunteerStatus('assigned');
+      if (user) {
+        localStorage.setItem(`stadium_volunteer_status_${user.id}`, 'assigned');
+      }
+      // Decrement ETA over time
+      const timer = setInterval(() => {
+        setVolunteerEta(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            setVolunteerStatus('arrived');
+            if (user) {
+              localStorage.setItem(`stadium_volunteer_status_${user.id}`, 'arrived');
+              localStorage.setItem(`stadium_volunteer_eta_${user.id}`, '0');
+            }
+            return 0;
+          }
+          const nextEta = prev - 1;
+          if (user) {
+            localStorage.setItem(`stadium_volunteer_eta_${user.id}`, String(nextEta));
+          }
+          return nextEta;
+        });
+      }, 5000);
+    }, 4000);
+  }, [user]);
+
+  const handleRequestService = useCallback((type: 'wheelchair' | 'guide' | 'sensory' | 'sign-language') => {
     addAccessibilityRequest(user?.email || 'visitor.demo@stadiumos.ai', type, 'Section 102 Row H');
+    const nowIso = new Date().toISOString();
+    const newReq: AccessibilityRequest = {
+      id: `acc-${new Date(nowIso).getTime()}`,
+      userEmail: user?.email || '',
+      requestType: type,
+      location: 'Section 102 Row H',
+      status: 'pending',
+      timestamp: nowIso
+    };
+    setLocalAccessibilityTickets(prev => {
+      const updatedAcc = [newReq, ...prev];
+      if (user) {
+        localStorage.setItem(`stadium_accessibility_${user.id}`, JSON.stringify(updatedAcc));
+      }
+      return updatedAcc;
+    });
     if (type === 'guide') {
       handleRequestVolunteer();
     }
-  };
+  }, [addAccessibilityRequest, user, handleRequestVolunteer]);
 
   // Visitor Profile custom configurations
   const getDynamicProfileDetails = () => {
@@ -430,18 +493,9 @@ export default function VisitorDashboard() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setMounted(true);
-      const isDemo = user?.email === 'visitor.demo@stadiumos.ai';
-      setAiMessages(isDemo ? [
-        {
-          id: 'ai-msg-init',
-          sender: 'assistant',
-          content: `Welcome back, Commissioner Fan Companion. I am your FIFA Smart Assistant. I see you are located near **Section 102** with an active ticket for today's Match. Ask me anything about routes, concessions, parking, or accessibility services.`,
-          timestamp: new Date().toISOString()
-        }
-      ] : []);
     }, 0);
     return () => clearTimeout(timer);
-  }, [user]);
+  }, []);
 
   // Auto-scroll AI chat
   useEffect(() => {
@@ -484,29 +538,19 @@ export default function VisitorDashboard() {
     }, 0);
     setOrderEta(maxEta);
     
+    if (user) {
+      localStorage.setItem(`stadium_order_status_${user.id}`, 'placed');
+      localStorage.setItem(`stadium_order_eta_${user.id}`, String(maxEta));
+      localStorage.setItem(`stadium_order_reserved_time_${user.id}`, formatted);
+    }
+
     // Simulate order progress
     setTimeout(() => {
       setOrderStatus('ready');
+      if (user) {
+        localStorage.setItem(`stadium_order_status_${user.id}`, 'ready');
+      }
     }, 12000);
-  };
-
-  // Volunteer Dispatcher simulation
-  const handleRequestVolunteer = () => {
-    setVolunteerStatus('requested');
-    setTimeout(() => {
-      setVolunteerStatus('assigned');
-      // Decrement ETA over time
-      const timer = setInterval(() => {
-        setVolunteerEta(prev => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            setVolunteerStatus('arrived');
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 5000);
-    }, 4000);
   };
 
   // Emergency safety beacon dispatcher
@@ -519,8 +563,19 @@ export default function VisitorDashboard() {
   // Chat query logic for Fan Companion
   const handleSendAiMessage = async () => {
     if (!aiInput.trim() || aiThinking) return;
-    const userMsg = { id: `usr-${Date.now()}`, sender: 'user' as const, content: aiInput.trim(), timestamp: new Date().toISOString() };
-    setAiMessages(prev => [...prev, userMsg]);
+    const userMsg: ChatMessage = {
+      id: `usr-${Date.now()}`,
+      sender: 'user',
+      content: aiInput.trim(),
+      timestamp: new Date().toLocaleTimeString()
+    };
+    setAiMessages(prev => {
+      const updated = [...prev, userMsg];
+      if (user) {
+        localStorage.setItem(`stadium_ai_messages_${user.id}`, JSON.stringify(updated));
+      }
+      return updated;
+    });
     setAiInput('');
     setAiThinking(true);
 
@@ -558,7 +613,19 @@ export default function VisitorDashboard() {
 
     setTimeout(() => {
       setAiThinking(false);
-      setAiMessages(prev => [...prev, { id: `ai-${Date.now()}`, sender: 'assistant', content: reply, timestamp: new Date().toISOString() }]);
+      const assistantMsg: ChatMessage = {
+        id: `ai-${Date.now()}`,
+        sender: 'assistant',
+        content: reply,
+        timestamp: new Date().toLocaleTimeString()
+      };
+      setAiMessages(prev => {
+        const updated = [...prev, assistantMsg];
+        if (user) {
+          localStorage.setItem(`stadium_ai_messages_${user.id}`, JSON.stringify(updated));
+        }
+        return updated;
+      });
     }, 1500);
   };
 

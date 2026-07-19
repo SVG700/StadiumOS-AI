@@ -15,7 +15,7 @@ interface Conversation {
   metadata?: string;
 }
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -25,9 +25,9 @@ import { DatabaseService } from '@/lib/db';
 import { jsPDF } from 'jspdf';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Bot, Send, User, Sparkles, Terminal, CheckCircle, AlertTriangle, Info, Map, 
-  ShieldAlert, PhoneCall, Accessibility, Check, X, ShieldCheck, Search, Plus,
-  Pin, Trash2, Edit2, Download, RefreshCw
+  Bot, Send, User, Sparkles, Terminal, CheckCircle, Info, Map, 
+  ShieldAlert, PhoneCall, Accessibility, Check, X, Search, Plus,
+  Pin, Trash2, Edit2, Download
 } from 'lucide-react';
 
 const QUICK_PROMPTS_VISITOR = [
@@ -52,14 +52,12 @@ interface Toast {
 
 let messageCounter = 0;
 const generateUniqueId = (prefix: string) => `${prefix}-${++messageCounter}-${Math.random().toString(36).substring(2, 6)}`;
-const getIsoTimestamp = () => new Date().toISOString();
 
 export default function AIAssistantPage() {
   const { user } = useAuth();
 
   // Shared Stadium Context
   const { 
-    stadiums,
     selectedStadium, 
     selectStadium, 
     executeAction, 

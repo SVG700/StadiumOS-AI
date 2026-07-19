@@ -3,19 +3,17 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useAuth } from '@/components/auth/AuthProvider';
 import { DatabaseService } from '@/lib/db';
 import { 
   ShieldCheck, ShieldAlert, Clock, ArrowLeft, Check, X,
-  Building, User, Mail, Shield, AlertCircle
+  Building, User, Mail, Shield
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function AccessRequestsAdminPage() {
-  const { user } = useAuth();
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'Pending' | 'Approved' | 'Rejected'>('Pending');

@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/preserve-manual-memoization */
 /* eslint-disable react-hooks/exhaustive-deps */
 'use client';
 

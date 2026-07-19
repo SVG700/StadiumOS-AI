@@ -23,7 +23,7 @@ interface Conversation {
 }
 import { 
   Bot, Send, Activity, AlertTriangle, Pin, Trash2, Edit2, Check, X,
-  Search, Plus, Download, FileText, Calendar, CheckSquare, Sparkles, Loader2, ArrowLeft
+  Search, Plus, Download, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -74,7 +74,7 @@ export default function FifaAiCopilotPage() {
       try {
         const res = await checkGeminiStatus();
         setIsOnline(res.online);
-      } catch (e) {
+      } catch {
         setIsOnline(false);
       }
     }
@@ -243,7 +243,7 @@ Highest Risk Alert: Los Angeles Gate 5 approaching congestion.
         const updatedList = await DatabaseService.getConversations(user.id, user.role);
         setConversations(updatedList);
       }
-    } catch (e) {
+    } catch {
       const errMsg = await DatabaseService.addMessage(conv.id, 'system', 'Gemini AI is temporarily offline.');
       setMessages((prev: ChatMessage[]) => [...prev, errMsg]);
     } finally {

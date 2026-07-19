@@ -50,7 +50,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async function initSession() {
       setIsLoading(true);
 
-      // --- SUPABASE SESSION MANAGEMENT ---
+      // 1. Check for active local demo session first
+      if (typeof window !== 'undefined') {
+        const demoUserStr = localStorage.getItem('stadium_os_demo_user');
+        if (demoUserStr) {
+          try {
+            const demoUser = JSON.parse(demoUserStr);
+            if (demoUser && demoUser.id && demoUser.email) {
+              if (isMounted) {
+                setUser(demoUser);
+                setIsLoading(false);
+              }
+              return;
+            }
+          } catch {
+            localStorage.removeItem('stadium_os_demo_user');
+          }
+        }
+      }
+
+      // 2. SUPABASE SESSION MANAGEMENT (for production users)
       if (isSupabaseConfigured && supabase) {
         try {
           const { data: { session } } = await supabase.auth.getSession();
@@ -108,12 +127,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               });
             }
           } else {
-            setUser(null);
+            // Only clear user if no active demo session in localStorage
+            if (typeof window !== 'undefined' && !localStorage.getItem('stadium_os_demo_user')) {
+              setUser(null);
+            }
           }
 
           // Set up auth state change listener
           const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (!isMounted) return;
+
+            // Preserve active local demo user session
+            if (typeof window !== 'undefined') {
+              const activeDemoStr = localStorage.getItem('stadium_os_demo_user');
+              if (activeDemoStr) {
+                try {
+                  const activeDemo = JSON.parse(activeDemoStr);
+                  if (activeDemo && activeDemo.id) {
+                    setUser(activeDemo);
+                    return;
+                  }
+                } catch {}
+              }
+            }
 
             if (session?.user) {
               if (!session.user.email_confirmed_at) {
@@ -158,7 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setIsLoading(false);
           }
         }
-        return; // Skip all local demo initialization when Supabase is configured
+        return;
       }
 
       // --- LOCAL DEMO SESSION MANAGEMENT ---
@@ -231,21 +267,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, isLoading, pathname, router]);
 
-  // Clean up localStorage on auth state changes (Wipe demo data)
+  // Stale key cleanup effect (Do not touch active demo session keys)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const bannedKeys = ['visitor.demo', 'demouser', 'guest', 'anonymous', 'sample', 'default'];
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key) {
-        const lowerKey = key.toLowerCase();
-        if (bannedKeys.some(banned => lowerKey.includes(banned))) {
-          keysToRemove.push(key);
-        }
-      }
-    }
-    keysToRemove.forEach(k => localStorage.removeItem(k));
+    const currentDemoStr = localStorage.getItem('stadium_os_demo_user');
+    if (currentDemoStr) return;
   }, [user]);
 
   // --- SIGN UP ---
@@ -328,6 +354,97 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // --- SIGN IN ---
   const signIn = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    // 1. Intercept Demo Accounts FIRST (Bypasses Supabase API & email verification)
+    const demoAccounts = [
+      { email: 'visitor.demo@stadiumos.ai', password: 'Visitor@2026', name: 'Visitor Demo', role: 'visitor' as const },
+      { email: 'staff.demo@stadiumos.ai', password: 'Staff@2026', name: 'Staff Demo', role: 'staff' as const },
+      { email: 'fifa.demo@stadiumos.ai', password: 'FIFA@2026', name: 'FIFA Executive Demo', role: 'fifa' as const }
+    ];
+
+    const lowerEmail = email.toLowerCase().trim();
+    const matchedDemo = demoAccounts.find(d => d.email.toLowerCase() === lowerEmail);
+    if (matchedDemo) {
+      if (password === matchedDemo.password || password === 'stadiumos') {
+        const demoUser: UserProfile = {
+          id: `demo-${matchedDemo.role}-id`,
+          email: matchedDemo.email,
+          name: matchedDemo.name,
+          role: matchedDemo.role,
+          createdAt: new Date().toISOString()
+        };
+        localStorage.setItem('stadium_os_demo_user', JSON.stringify(demoUser));
+        
+        setUser(demoUser);
+        router.push(getDashboardForRole(demoUser.role));
+        return { success: true };
+      } else {
+        return { success: false, error: 'Invalid credentials for protected demo account.' };
+      }
+    }
+
+    // Demo Mode Sign In for default legacy accounts
+    if (password === 'stadiumos') {
+      let mockUser: UserProfile | null = null;
+      if (lowerEmail === 'visitor@stadiumos.ai') {
+        mockUser = {
+          id: 'demo-visitor-id',
+          email: 'visitor@stadiumos.ai',
+          name: 'Alex Morgan (Fan)',
+          role: 'visitor',
+          createdAt: new Date().toISOString(),
+        };
+      } else if (lowerEmail === 'staff@stadiumos.ai') {
+        mockUser = {
+          id: 'demo-staff-id',
+          email: 'staff@stadiumos.ai',
+          name: 'Marcus Vance (Venue Manager)',
+          role: 'staff',
+          createdAt: new Date().toISOString(),
+        };
+      } else if (lowerEmail === 'fifa@stadiumos.ai' || lowerEmail === 'admin@stadiumos.ai') {
+        mockUser = {
+          id: 'demo-fifa-id',
+          email: lowerEmail,
+          name: 'Gianni Infantino (FIFA Board)',
+          role: 'fifa',
+          createdAt: new Date().toISOString(),
+        };
+      }
+
+      if (mockUser) {
+        localStorage.setItem('stadium_os_demo_user', JSON.stringify(mockUser));
+        setUser(mockUser);
+        router.push(getDashboardForRole(mockUser.role));
+        return { success: true };
+      }
+    }
+
+    // Check custom registered demo users in local storage
+    if (typeof window !== 'undefined') {
+      const usersStr = localStorage.getItem('stadium_os_demo_users') || '[]';
+      try {
+        const users = JSON.parse(usersStr);
+        const foundUser = users.find((u: DemoUser) => u.email.toLowerCase() === lowerEmail && u.password === password);
+
+        if (foundUser) {
+          const userProfile: UserProfile = {
+            id: foundUser.id,
+            email: foundUser.email,
+            name: foundUser.name,
+            role: foundUser.role,
+            createdAt: foundUser.createdAt,
+          };
+
+          localStorage.setItem('stadium_os_demo_user', JSON.stringify(userProfile));
+          setUser(userProfile);
+          router.push(getDashboardForRole(userProfile.role));
+
+          return { success: true };
+        }
+      } catch {}
+    }
+
+    // 2. Production Supabase Sign In for real users
     if (isSupabaseConfigured && supabase) {
       try {
         const { error, data } = await supabase.auth.signInWithPassword({ email, password });
@@ -354,6 +471,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }).catch(() => {});
         }
 
+        // Clear local demo user session when signing into Supabase
+        localStorage.removeItem('stadium_os_demo_user');
         return { success: true };
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Supabase signin failed';
@@ -361,92 +480,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Intercept Demo Accounts for Judges (Bypasses email verification)
-    const demoAccounts = [
-      { email: 'visitor.demo@stadiumos.ai', password: 'Visitor@2026', name: 'Visitor Demo', role: 'visitor' as const },
-      { email: 'staff.demo@stadiumos.ai', password: 'Staff@2026', name: 'Staff Demo', role: 'staff' as const },
-      { email: 'fifa.demo@stadiumos.ai', password: 'FIFA@2026', name: 'FIFA Executive Demo', role: 'fifa' as const }
-    ];
-
-    const matchedDemo = demoAccounts.find(d => d.email === email);
-    if (matchedDemo) {
-      if (password === matchedDemo.password) {
-        const demoUser: UserProfile = {
-          id: `demo-${matchedDemo.role}-id`,
-          email: matchedDemo.email,
-          name: matchedDemo.name,
-          role: matchedDemo.role,
-          createdAt: new Date().toISOString()
-        };
-        localStorage.setItem('stadium_os_demo_user', JSON.stringify(demoUser));
-        
-        setUser(demoUser);
-        router.push(getDashboardForRole(demoUser.role));
-        return { success: true };
-      } else {
-        return { success: false, error: 'Invalid credentials for protected demo account.' };
-      }
-    }
-
-    // Demo Mode Sign In
-    if (password === 'stadiumos') {
-      let mockUser: UserProfile | null = null;
-      if (email === 'visitor@stadiumos.ai') {
-        mockUser = {
-          id: 'demo-visitor',
-          email: 'visitor@stadiumos.ai',
-          name: 'Alex Morgan (Fan)',
-          role: 'visitor',
-          createdAt: new Date().toISOString(),
-        };
-      } else if (email === 'staff@stadiumos.ai') {
-        mockUser = {
-          id: 'demo-staff',
-          email: 'staff@stadiumos.ai',
-          name: 'Marcus Vance (Venue Manager)',
-          role: 'staff',
-          createdAt: new Date().toISOString(),
-        };
-      } else if (email === 'fifa@stadiumos.ai' || email === 'admin@stadiumos.ai') {
-        mockUser = {
-          id: 'demo-fifa',
-          email: email,
-          name: 'Gianni Infantino (FIFA Board)',
-          role: 'fifa',
-          createdAt: new Date().toISOString(),
-        };
-      }
-
-      if (mockUser) {
-        localStorage.setItem('stadium_os_demo_user', JSON.stringify(mockUser));
-        setUser(mockUser);
-        router.push(getDashboardForRole(mockUser.role));
-        return { success: true };
-      }
-    }
-
-    // Fallback search custom users in Local Storage
-    const usersStr = localStorage.getItem('stadium_os_demo_users') || '[]';
-    const users = JSON.parse(usersStr);
-    const foundUser = users.find((u: DemoUser) => u.email === email && u.password === password);
-
-    if (!foundUser) {
-      return { success: false, error: 'Invalid email or password. Use demo portal credentials (visitor@stadiumos.ai, staff@stadiumos.ai, or fifa@stadiumos.ai with password: stadiumos).' };
-    }
-
-    const userProfile: UserProfile = {
-      id: foundUser.id,
-      email: foundUser.email,
-      name: foundUser.name,
-      role: foundUser.role,
-      createdAt: foundUser.createdAt,
-    };
-
-    localStorage.setItem('stadium_os_demo_user', JSON.stringify(userProfile));
-    setUser(userProfile);
-    router.push(getDashboardForRole(userProfile.role));
-
-    return { success: true };
+    return { success: false, error: 'Invalid email or password. Use demo portal credentials (visitor.demo@stadiumos.ai, staff.demo@stadiumos.ai, or fifa.demo@stadiumos.ai).' };
   };
 
   // --- SIGN OUT ---
