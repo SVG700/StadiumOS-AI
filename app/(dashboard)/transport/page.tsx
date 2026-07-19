@@ -1,104 +1,88 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Bus, Clock, Compass, AlertTriangle } from 'lucide-react';
+import { Bus, Clock, AlertTriangle, RefreshCw } from 'lucide-react';
 
 export default function TransportationPage() {
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 700);
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Title */}
-      <div className="flex flex-col gap-2">
-        <h2 className="text-2xl font-extrabold text-white">Logistics & Transportation</h2>
-        <p className="text-sm text-slate-400">Manage metro intervals, parking shuttle fleets, and highway congestion sensors.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-extrabold text-white">Logistics & Transportation</h2>
+          <p className="text-xs text-slate-400">Metro line status, parking shuttle intervals, and road congestion monitoring.</p>
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="text-xs flex gap-1.5 items-center border-slate-800 bg-[#0c101d] text-slate-300 cursor-pointer self-start sm:self-auto"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+          <span>Refresh Transit</span>
+        </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        {/* Left Side: Fleet Telemetry */}
-        <div className="md:col-span-1 space-y-4">
-          <Card className="bg-[#080d19]/45 border-slate-900/60">
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-blue-400">
-                <Bus className="h-4 w-4" />
-                Transit Fleet Status
-              </CardTitle>
-              <CardDescription className="text-xs">Summary of active transit vehicles</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3.5 text-xs">
-              <div className="flex justify-between items-center p-2 rounded bg-slate-950/40 border border-slate-900">
-                <span className="text-slate-300 font-semibold">Active Shuttle Buses</span>
-                <Badge variant="success">45 Running</Badge>
-              </div>
-              <div className="flex justify-between items-center p-2 rounded bg-slate-950/40 border border-slate-900">
-                <span className="text-slate-300 font-semibold">Metro Block Trainsets</span>
-                <Badge variant="success">12 Active</Badge>
-              </div>
-              <div className="flex justify-between items-center p-2 rounded bg-slate-950/40 border border-slate-900">
-                <span className="text-slate-300 font-semibold">Taxi Drop Bays</span>
-                <Badge variant="warning">82% Capacity</Badge>
-              </div>
-              <div className="flex justify-between items-center p-2 rounded bg-slate-950/40 border border-slate-900">
-                <span className="text-slate-300 font-semibold">Charter Coach Park</span>
-                <Badge variant="success">140 Parked</Badge>
-              </div>
-            </CardContent>
-          </Card>
-
+      <div className="grid gap-5 md:grid-cols-3">
+        {/* Left Side: Road Congestion & Alerts */}
+        <div className="space-y-5">
           <Card className="bg-[#080d19]/45 border-slate-900/60 border-amber-950/30">
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-amber-400">
+            <CardHeader className="py-3 px-4 border-b border-slate-900/40">
+              <CardTitle className="text-xs font-semibold flex items-center gap-1.5 text-amber-400">
                 <AlertTriangle className="h-4 w-4" />
-                Logistics Bulletin
+                Road Congestion Alerts
               </CardTitle>
-              <CardDescription className="text-xs">Real-time alerts affecting inbound traffic</CardDescription>
+              <CardDescription className="text-[10px]">Real-time inbound highway conditions</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2 text-xs">
-              <div className="p-3 rounded bg-amber-500/10 border border-amber-500/20 text-slate-300">
-                <h4 className="font-bold text-white mb-0.5">Highway Ramp Congestion</h4>
-                <p className="text-[10px] text-slate-400">Avenue 4 exit blocked due to security perimeter check. Shuttle route B redirected.</p>
+            <CardContent className="p-4 space-y-2.5 text-xs">
+              <div className="p-3 rounded bg-amber-500/10 border border-amber-500/20 text-slate-300 space-y-1">
+                <h4 className="font-bold text-white text-xs">Avenue 4 Exit Congestion</h4>
+                <p className="text-[10px] text-slate-400 leading-tight">Perimeter security checks causing 8 min delay. Shuttle Route B redirected.</p>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Right Side: Schedules Board */}
-        <Card className="md:col-span-2">
-          <CardHeader className="flex flex-row justify-between items-center pb-2">
-            <div>
-              <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
-                <Clock className="h-4 w-4 text-cyan-400" />
-                Live Transit Dispatch Board
-              </CardTitle>
-              <CardDescription className="text-xs">Incoming and departing logistics fleets telemetry</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" className="text-xs border-slate-800 bg-[#0c101d] text-slate-300">
-              Refresh Schedules
-            </Button>
+        {/* Right Side: Live Transit Board (Metro & Shuttles) */}
+        <Card className="md:col-span-2 bg-[#080d19]/45 border-slate-900/60">
+          <CardHeader className="py-3 px-4 border-b border-slate-900/40">
+            <CardTitle className="text-xs font-semibold flex items-center gap-1.5 text-white">
+              <Clock className="h-4 w-4 text-cyan-400" />
+              Live Metro & Shuttle Status Board
+            </CardTitle>
+            <CardDescription className="text-[10px]">Incoming and departing spectator transit telemetry</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4 border-t border-slate-900/60 pt-4">
-            {/* Transit Line Grid */}
+          <CardContent className="p-4 space-y-3">
             {[
-              { id: '1', route: 'Stadium Express (Line 1)', mode: 'Metro Train', status: 'On Time', eta: '4 min', occupancy: 'High' },
-              { id: '2', route: 'Downtown Shuttle (Route A)', mode: 'Shuttle Bus', status: 'Delayed (12m)', eta: '12 min', occupancy: 'Medium' },
-              { id: '3', route: 'West Parking Transfer', mode: 'Electric Shuttle', status: 'On Time', eta: '3 min', occupancy: 'Low' },
-              { id: '4', route: 'Regional Commuter Rail', mode: 'Commuter Train', status: 'On Time', eta: '18 min', occupancy: 'High' },
-              { id: '5', route: 'VIP Airport Escort (Fleet C)', mode: 'Electric VIP SUV', status: 'On Time', eta: '8 min', occupancy: 'Low' }
+              { id: '1', route: 'Stadium Express (Metro Line 1)', mode: 'Metro Train', status: 'On Time', eta: '4 min', load: 'High' },
+              { id: '2', route: 'Downtown Shuttle (Route A)', mode: 'Shuttle Bus', status: 'Delayed (12m)', eta: '12 min', load: 'Medium' },
+              { id: '3', route: 'West Parking Transfer', mode: 'Electric Shuttle', status: 'On Time', eta: '3 min', load: 'Low' },
+              { id: '4', route: 'Regional Commuter Rail', mode: 'Commuter Train', status: 'On Time', eta: '18 min', load: 'High' },
             ].map((transit) => (
-              <div key={transit.id} className="flex items-center justify-between p-3.5 rounded-lg border border-slate-800 bg-[#080d19]/35 text-xs">
+              <div key={transit.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-800 bg-[#080d19]/35 text-xs">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded bg-slate-950/80 border border-slate-800 text-cyan-400">
-                    <Compass className="h-4.5 w-4.5" />
+                    <Bus className="h-4 w-4" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-white text-sm">{transit.route}</h4>
-                    <p className="text-[10px] text-slate-500">{transit.mode} • Load: {transit.occupancy}</p>
+                    <h4 className="font-bold text-white text-xs">{transit.route}</h4>
+                    <p className="text-[10px] text-slate-500">{transit.mode} • Occupancy: {transit.load}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="font-bold text-white block text-sm">{transit.eta}</span>
-                  <Badge variant={transit.status.includes('Delay') ? 'warning' : 'success'}>
+                  <span className="font-bold text-white block text-xs">{transit.eta}</span>
+                  <Badge variant={transit.status.includes('Delay') ? 'warning' : 'success'} className="text-[9px]">
                     {transit.status}
                   </Badge>
                 </div>

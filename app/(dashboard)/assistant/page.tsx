@@ -134,15 +134,36 @@ export default function AIAssistantPage() {
 
     async function loadConversations() {
       const data = await DatabaseService.getConversations(user!.id, user!.role);
-      setConversations(data);
       
-      // Auto-open most recent conversation
-      if (data.length > 0) {
-        handleSelectConversation(data[0]);
+      // Start every page load with a new operational briefing
+      const metadata = {
+        stadiumId: selectedStadium.id,
+        stadiumName: selectedStadium.name,
+        matchday: '12',
+        stage: selectedStadium.match?.stage || 'Quarter Final',
+        dashboard: user!.role,
+        timestamp: new Date().toISOString()
+      };
+      const title = user!.role === 'visitor' 
+        ? 'Fan Companion Chat' 
+        : `Operational Briefing (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`;
+      
+      const newConv = await DatabaseService.createConversation(user!.id, user!.role as any, title, metadata);
+      const welcomeText = user!.role === 'visitor'
+        ? `Welcome! I am your **FIFA Fan Companion AI**. How can I help you in the stadium today?`
+        : `Operational Briefing Active. State parameters nominal. Ready for operational inquiries.`;
+      
+      await DatabaseService.addMessage(newConv.id, 'assistant', welcomeText);
+      
+      const updatedList = await DatabaseService.getConversations(user!.id, user!.role);
+      setConversations(updatedList.length > 0 ? updatedList : data);
+      const match = updatedList.find(c => c.id === newConv.id);
+      if (match) {
+        handleSelectConversation(match);
       }
     }
     loadConversations();
-  }, [user, handleSelectConversation]);
+  }, [user, handleSelectConversation, selectedStadium]);
 
   // Auto-scroll to bottom of chat
   useEffect(() => {
@@ -985,21 +1006,21 @@ export default function AIAssistantPage() {
             </AnimatePresence>
 
             {!activeConv ? (
-              <div className="flex-1 flex flex-col justify-center items-center text-center space-y-6 my-auto min-h-[45vh]">
+              <div className="flex-1 flex flex-col justify-center items-center text-center space-y-4 my-auto min-h-[45vh]">
                 <div className="h-10 w-10 rounded-full bg-cyan-950/15 border border-cyan-900/30 flex items-center justify-center text-cyan-400 shrink-0">
                   <Bot className="h-5 w-5 animate-pulse" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-350 font-bold uppercase tracking-wider font-mono">StadiumOS Decision Portal</p>
-                  <p className="text-[10px] text-slate-500 max-w-xs leading-relaxed mx-auto">
-                    Select a previous session from the history sidebar or create a new session to begin auditing.
+                  <p className="text-xs text-slate-200 font-bold uppercase tracking-wider font-mono">No conversations yet.</p>
+                  <p className="text-[11px] text-slate-400 max-w-xs leading-relaxed mx-auto">
+                    Start a new operational briefing.
                   </p>
                 </div>
                 <Button
                   onClick={() => handleNewChat()}
-                  className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold h-9 px-6 rounded-lg text-xs"
+                  className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold h-9 px-6 rounded-lg text-xs cursor-pointer"
                 >
-                  Start New Session
+                  Start New Operational Briefing
                 </Button>
               </div>
             ) : messages.length === 0 ? (
