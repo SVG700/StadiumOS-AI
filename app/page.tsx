@@ -1,20 +1,15 @@
 'use client';
 
-import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth, getDashboardForRole } from '@/components/auth/AuthProvider';
+import { useAuth } from '@/components/auth/AuthProvider';
 import { Users, Ticket, Shield, Building, Globe, Trophy, Info, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function PortalSelectionPage() {
-  const { user, isLoading } = useAuth();
+  const { isLoading } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!isLoading && user) {
-      router.push(getDashboardForRole(user.role));
-    }
-  }, [user, isLoading, router]);
+
 
   const handlePortalSelect = (portal: 'visitor' | 'staff' | 'fifa') => {
     router.push(`/login?portal=${portal}`);
